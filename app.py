@@ -186,7 +186,10 @@ class _PgConn:
         # Remettre la connexion dans le pool au lieu de la fermer
         global _pg_pool
         if _pg_pool:
-            self._c.autocommit = False
+            try:
+                self._c.rollback()   # annule toute transaction pendante avant retour au pool
+            except Exception:
+                pass
             _pg_pool.putconn(self._c)
         else:
             self._c.close()
@@ -203,7 +206,6 @@ def _get_pg_pool():
 def get_db():
     if USE_PG:
         conn = _get_pg_pool().getconn()
-        conn.autocommit = False
         return _PgConn(conn)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
