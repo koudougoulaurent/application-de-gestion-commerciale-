@@ -1,9 +1,9 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, abort
 import os
+import re
 import secrets
+import sqlite3
 from datetime import datetime, date
-import psycopg2
-import psycopg2.extras
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -11,6 +11,12 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
+DB_PATH = os.path.join(os.path.dirname(__file__), 'gafarou.db')
+USE_PG = bool(DATABASE_URL)
+
+if USE_PG:
+    import psycopg2
+    import psycopg2.extras
 
 
 # ───────────── SÉCURITÉ ─────────────
@@ -57,6 +63,17 @@ def inject_globals():
             WHERE v.statut = 'en_cours'
             ORDER BY reste DESC
             LIMIT 20
+        """ if USE_PG else """
+            SELECT v.id, v.numero, v.date_vente,
+                   c.nom || ' ' || COALESCE(c.prenom,'') AS client_nom,
+                   c.telephone,
+                   (v.montant_total - v.montant_paye) AS reste,
+                   CAST(julianday('now') - julianday(v.date_vente) AS INTEGER) AS jours
+            FROM ventes v
+            JOIN clients c ON c.id = v.client_id
+            WHERE v.statut = 'en_cours'
+            ORDER BY reste DESC
+            LIMIT 20
         """).fetchall()
         conn.close()
         for r in rows:
@@ -87,8 +104,43 @@ def forbidden(_):
 
 # ───────────────────────────────── BASE DE DONNÉES ─────────────────────────────────
 
-class _Cur:
-    """Encapsule un curseur psycopg2, fournit lastrowid via RETURNING id."""
+# ── Wrappers SQLite ──
+class _SqliteCur:
+    def __init__(self, cur):
+        self._cur = cur
+        self._rowid = cur.lastrowid
+
+    def fetchone(self):
+        r = self._cur.fetchone()
+        return dict(r) if r else None
+
+    def fetchall(self):
+        return [dict(r) for r in self._cur.fetchall()]
+
+    @property
+    def lastrowid(self):
+        return self._rowid
+
+
+class _SqliteConn:
+    def __init__(self, conn):
+        self._c = conn
+
+    def execute(self, sql, params=None):
+        # SQLite ne supporte pas RETURNING — on le retire
+        sql = re.sub(r'\s*RETURNING\s+id\s*$', '', sql.strip(), flags=re.IGNORECASE)
+        cur = self._c.execute(sql, params if params is not None else ())
+        return _SqliteCur(cur)
+
+    def commit(self):
+        self._c.commit()
+
+    def close(self):
+        self._c.close()
+
+
+# ── Wrappers PostgreSQL ──
+class _PgCur:
     def __init__(self, cur):
         self._cur = cur
 
@@ -98,24 +150,20 @@ class _Cur:
     def fetchall(self):
         return self._cur.fetchall()
 
-    def __iter__(self):
-        return iter(self._cur.fetchall())
-
     @property
     def lastrowid(self):
         row = self._cur.fetchone()
         return row['id'] if row else None
 
 
-class _Conn:
-    """Encapsule une connexion psycopg2 pour imiter l'API sqlite3."""
+class _PgConn:
     def __init__(self, conn):
         self._c = conn
 
     def execute(self, sql, params=None):
         cur = self._c.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(sql.replace('?', '%s'), params if params is not None else ())
-        return _Cur(cur)
+        return _PgCur(cur)
 
     def commit(self):
         self._c.commit()
@@ -125,75 +173,140 @@ class _Conn:
 
 
 def get_db():
-    conn = psycopg2.connect(DATABASE_URL)
-    return _Conn(conn)
+    if USE_PG:
+        return _PgConn(psycopg2.connect(DATABASE_URL))
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    return _SqliteConn(conn)
 
 
 def init_db():
-    if not DATABASE_URL:
-        return
-    conn = psycopg2.connect(DATABASE_URL)
-    conn.autocommit = True
-    cur = conn.cursor()
-    ddl = [
-        """CREATE TABLE IF NOT EXISTS clients (
-            id               SERIAL PRIMARY KEY,
-            nom              TEXT NOT NULL,
-            prenom           TEXT DEFAULT '',
-            telephone        TEXT DEFAULT '',
-            adresse          TEXT DEFAULT '',
-            date_inscription DATE DEFAULT CURRENT_DATE
-        )""",
-        """CREATE TABLE IF NOT EXISTS produits (
-            id            SERIAL PRIMARY KEY,
-            nom           TEXT NOT NULL,
-            categorie     TEXT DEFAULT '',
-            prix_unitaire DOUBLE PRECISION NOT NULL DEFAULT 0,
-            description   TEXT DEFAULT '',
-            actif         SMALLINT DEFAULT 1
-        )""",
-        """CREATE TABLE IF NOT EXISTS ventes (
-            id            SERIAL PRIMARY KEY,
-            numero        TEXT UNIQUE NOT NULL,
-            client_id     INTEGER NOT NULL REFERENCES clients(id),
-            date_vente    DATE NOT NULL,
-            montant_total DOUBLE PRECISION NOT NULL DEFAULT 0,
-            montant_paye  DOUBLE PRECISION NOT NULL DEFAULT 0,
-            statut        TEXT DEFAULT 'en_cours',
-            notes         TEXT DEFAULT '',
-            date_creation TIMESTAMPTZ DEFAULT NOW()
-        )""",
-        """CREATE TABLE IF NOT EXISTS vente_items (
-            id            SERIAL PRIMARY KEY,
-            vente_id      INTEGER NOT NULL REFERENCES ventes(id),
-            produit_id    INTEGER,
-            produit_nom   TEXT NOT NULL,
-            quantite      INTEGER NOT NULL DEFAULT 1,
-            prix_unitaire DOUBLE PRECISION NOT NULL DEFAULT 0
-        )""",
-        """CREATE TABLE IF NOT EXISTS paiements (
-            id             SERIAL PRIMARY KEY,
-            vente_id       INTEGER NOT NULL REFERENCES ventes(id),
-            date_paiement  DATE NOT NULL,
-            montant        DOUBLE PRECISION NOT NULL,
-            notes          TEXT DEFAULT ''
-        )""",
-        """CREATE TABLE IF NOT EXISTS parametres (
-            id                  INTEGER PRIMARY KEY,
-            nom_boutique        TEXT DEFAULT 'Ma Boutique',
-            adresse_boutique    TEXT DEFAULT '',
-            telephone_boutique  TEXT DEFAULT '',
-            devise              TEXT DEFAULT 'FCFA',
-            proprietaire        TEXT DEFAULT ''
-        )""",
-        """INSERT INTO parametres (id, nom_boutique, devise)
-           VALUES (1, 'ART Gestion Crédit', 'FCFA')
-           ON CONFLICT DO NOTHING""",
-    ]
-    for stmt in ddl:
-        cur.execute(stmt)
-    cur.close()
-    conn.close()
+    if USE_PG:
+        conn = psycopg2.connect(DATABASE_URL)
+        conn.autocommit = True
+        cur = conn.cursor()
+        ddl = [
+            """CREATE TABLE IF NOT EXISTS clients (
+                id               SERIAL PRIMARY KEY,
+                nom              TEXT NOT NULL,
+                prenom           TEXT DEFAULT '',
+                telephone        TEXT DEFAULT '',
+                adresse          TEXT DEFAULT '',
+                date_inscription DATE DEFAULT CURRENT_DATE
+            )""",
+            """CREATE TABLE IF NOT EXISTS produits (
+                id            SERIAL PRIMARY KEY,
+                nom           TEXT NOT NULL,
+                categorie     TEXT DEFAULT '',
+                prix_unitaire DOUBLE PRECISION NOT NULL DEFAULT 0,
+                description   TEXT DEFAULT '',
+                actif         SMALLINT DEFAULT 1
+            )""",
+            """CREATE TABLE IF NOT EXISTS ventes (
+                id            SERIAL PRIMARY KEY,
+                numero        TEXT UNIQUE NOT NULL,
+                client_id     INTEGER NOT NULL REFERENCES clients(id),
+                date_vente    DATE NOT NULL,
+                montant_total DOUBLE PRECISION NOT NULL DEFAULT 0,
+                montant_paye  DOUBLE PRECISION NOT NULL DEFAULT 0,
+                statut        TEXT DEFAULT 'en_cours',
+                notes         TEXT DEFAULT '',
+                date_creation TIMESTAMPTZ DEFAULT NOW()
+            )""",
+            """CREATE TABLE IF NOT EXISTS vente_items (
+                id            SERIAL PRIMARY KEY,
+                vente_id      INTEGER NOT NULL REFERENCES ventes(id),
+                produit_id    INTEGER,
+                produit_nom   TEXT NOT NULL,
+                quantite      INTEGER NOT NULL DEFAULT 1,
+                prix_unitaire DOUBLE PRECISION NOT NULL DEFAULT 0
+            )""",
+            """CREATE TABLE IF NOT EXISTS paiements (
+                id             SERIAL PRIMARY KEY,
+                vente_id       INTEGER NOT NULL REFERENCES ventes(id),
+                date_paiement  DATE NOT NULL,
+                montant        DOUBLE PRECISION NOT NULL,
+                notes          TEXT DEFAULT ''
+            )""",
+            """CREATE TABLE IF NOT EXISTS parametres (
+                id                  INTEGER PRIMARY KEY,
+                nom_boutique        TEXT DEFAULT 'Ma Boutique',
+                adresse_boutique    TEXT DEFAULT '',
+                telephone_boutique  TEXT DEFAULT '',
+                devise              TEXT DEFAULT 'FCFA',
+                proprietaire        TEXT DEFAULT ''
+            )""",
+            """INSERT INTO parametres (id, nom_boutique, devise)
+               VALUES (1, 'ART Gestion Crédit', 'FCFA')
+               ON CONFLICT DO NOTHING""",
+        ]
+        for stmt in ddl:
+            cur.execute(stmt)
+        cur.close()
+        conn.close()
+    else:
+        # SQLite — création locale
+        conn = sqlite3.connect(DB_PATH)
+        conn.executescript('''
+            CREATE TABLE IF NOT EXISTS clients (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                nom              TEXT NOT NULL,
+                prenom           TEXT DEFAULT '',
+                telephone        TEXT DEFAULT '',
+                adresse          TEXT DEFAULT '',
+                date_inscription TEXT DEFAULT (date('now'))
+            );
+            CREATE TABLE IF NOT EXISTS produits (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                nom           TEXT NOT NULL,
+                categorie     TEXT DEFAULT '',
+                prix_unitaire REAL NOT NULL DEFAULT 0,
+                description   TEXT DEFAULT '',
+                actif         INTEGER DEFAULT 1
+            );
+            CREATE TABLE IF NOT EXISTS ventes (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                numero        TEXT UNIQUE NOT NULL,
+                client_id     INTEGER NOT NULL,
+                date_vente    TEXT NOT NULL,
+                montant_total REAL NOT NULL DEFAULT 0,
+                montant_paye  REAL NOT NULL DEFAULT 0,
+                statut        TEXT DEFAULT 'en_cours',
+                notes         TEXT DEFAULT '',
+                date_creation TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (client_id) REFERENCES clients(id)
+            );
+            CREATE TABLE IF NOT EXISTS vente_items (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                vente_id      INTEGER NOT NULL,
+                produit_id    INTEGER,
+                produit_nom   TEXT NOT NULL,
+                quantite      INTEGER NOT NULL DEFAULT 1,
+                prix_unitaire REAL NOT NULL DEFAULT 0,
+                FOREIGN KEY (vente_id) REFERENCES ventes(id)
+            );
+            CREATE TABLE IF NOT EXISTS paiements (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                vente_id       INTEGER NOT NULL,
+                date_paiement  TEXT NOT NULL,
+                montant        REAL NOT NULL,
+                notes          TEXT DEFAULT '',
+                FOREIGN KEY (vente_id) REFERENCES ventes(id)
+            );
+            CREATE TABLE IF NOT EXISTS parametres (
+                id                  INTEGER PRIMARY KEY CHECK (id = 1),
+                nom_boutique        TEXT DEFAULT 'Ma Boutique',
+                adresse_boutique    TEXT DEFAULT '',
+                telephone_boutique  TEXT DEFAULT '',
+                devise              TEXT DEFAULT 'FCFA',
+                proprietaire        TEXT DEFAULT ''
+            );
+            INSERT OR IGNORE INTO parametres (id, nom_boutique, devise)
+            VALUES (1, 'ART Gestion Crédit', 'FCFA');
+        ''')
+        conn.commit()
+        conn.close()
 
 
 def get_params():
@@ -244,6 +357,9 @@ def dashboard():
         'credits_soldes_mois': conn.execute(
             "SELECT COUNT(*) AS n FROM ventes WHERE statut='solde' "
             "AND to_char(date_creation, 'YYYY-MM') = to_char(NOW(), 'YYYY-MM')"
+            if USE_PG else
+            "SELECT COUNT(*) AS n FROM ventes WHERE statut='solde' "
+            "AND strftime('%Y-%m', date_creation)=strftime('%Y-%m','now')"
         ).fetchone()['n'],
         'total_clients': conn.execute("SELECT COUNT(*) AS n FROM clients").fetchone()['n'],
     }
