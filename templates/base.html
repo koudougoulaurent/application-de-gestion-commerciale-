@@ -25,10 +25,10 @@
       box-shadow:4px 0 18px rgba(0,0,0,.22);z-index:1000;
     }
     .sb-brand{
-      padding:18px 16px 14px;border-bottom:1px solid rgba(255,255,255,.15);
+      padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,.15);
     }
-    .sb-brand .logo{font-size:1.5rem;color:var(--accent);}
-    .sb-brand h5{margin:4px 0 2px;font-weight:700;font-size:.9rem;color:#e8f5e9;}
+    .sb-brand .sb-logo{width:52px;height:52px;object-fit:contain;border-radius:50%;background:#fff;padding:3px;flex-shrink:0;}
+    .sb-brand h5{margin:0;font-weight:700;font-size:.9rem;color:#e8f5e9;}
     .sb-brand small{color:rgba(255,255,255,.55);font-size:.72rem;}
     .sb-nav{padding:10px 0;flex:1;overflow-y:auto;}
     .sb-nav .nav-link{
@@ -228,9 +228,12 @@
 
 <!-- ─── Sidebar Mobile (Offcanvas) ─── -->
 <div class="offcanvas offcanvas-start sb-offcanvas" tabindex="-1" id="sidebarMobile">
-  <div class="offcanvas-header" style="border-bottom:1px solid rgba(255,255,255,.15);padding:14px 16px;">
+  <div class="offcanvas-header" style="border-bottom:1px solid rgba(255,255,255,.15);padding:12px 16px;">
     <div class="d-flex align-items-center gap-2">
-      <i class="bi bi-phone-fill logo"></i>
+      <img src="{{ url_for('static', filename='logo.png') }}" alt="logo"
+           style="width:42px;height:42px;object-fit:contain;border-radius:50%;background:#fff;padding:2px;flex-shrink:0;"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';">
+      <i class="bi bi-phone-fill" style="display:none;font-size:1.5rem;color:#a5d6a7;"></i>
       <div>
         <div class="fw-bold" style="color:#e8f5e9;font-size:.9rem;">{{ params.nom_boutique }}</div>
         <small style="color:rgba(255,255,255,.5);font-size:.7rem;">Gestion des Crédits</small>
@@ -278,9 +281,15 @@
 <!-- ─── Desktop Sidebar ─── -->
 <div class="sidebar d-none d-lg-flex flex-column">
   <div class="sb-brand">
-    <i class="bi bi-phone-fill logo"></i>
-    <h5>{{ params.nom_boutique }}</h5>
-    <small>Gestion des Crédits</small>
+    <div class="d-flex align-items-center gap-2">
+      <img src="{{ url_for('static', filename='logo.png') }}" alt="logo" class="sb-logo"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';">
+      <i class="bi bi-phone-fill" style="display:none;font-size:1.5rem;color:#a5d6a7;"></i>
+      <div>
+        <h5>{{ params.nom_boutique }}</h5>
+        <small>Gestion des Crédits</small>
+      </div>
+    </div>
   </div>
   <nav class="sb-nav">
     <a href="{{ url_for('dashboard') }}"

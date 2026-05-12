@@ -173,11 +173,16 @@
   <!-- EN-TETE -->
   <div class="recu-header">
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-      <div>
-        <p class="shop-name">{{ params.nom_boutique }}</p>
-        {% if params.adresse_boutique %}<p class="shop-info">{{ params.adresse_boutique }}</p>{% endif %}
-        {% if params.telephone_boutique %}<p class="shop-info">Tél. : {{ params.telephone_boutique }}</p>{% endif %}
-        {% if params.proprietaire %}<p class="shop-info">Responsable : {{ params.proprietaire }}</p>{% endif %}
+      <div class="d-flex align-items-center gap-3">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="logo"
+             style="width:66px;height:66px;object-fit:contain;border-radius:50%;background:#fff;padding:3px;flex-shrink:0;"
+             onerror="this.style.display='none';">
+        <div>
+          <p class="shop-name">{{ params.nom_boutique }}</p>
+          {% if params.adresse_boutique %}<p class="shop-info">{{ params.adresse_boutique }}</p>{% endif %}
+          {% if params.telephone_boutique %}<p class="shop-info">Tél. : {{ params.telephone_boutique }}</p>{% endif %}
+          {% if params.proprietaire %}<p class="shop-info">Responsable : {{ params.proprietaire }}</p>{% endif %}
+        </div>
       </div>
       <div class="doc-ref">
         <div class="num">N° {{ vente.numero }}</div>
