@@ -243,31 +243,31 @@
   </div>
   <div class="offcanvas-body p-0 d-flex flex-column">
     <nav class="sb-nav flex-grow-1">
-      <a href="{{ url_for('dashboard') }}" data-bs-dismiss="offcanvas"
+      <a href="{{ url_for('dashboard') }}"
          class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
         <i class="bi bi-speedometer2"></i> Tableau de Bord
       </a>
-      <a href="{{ url_for('clients') }}" data-bs-dismiss="offcanvas"
+      <a href="{{ url_for('clients') }}"
          class="nav-link {% if request.endpoint in ['clients','detail_client','ajouter_client','modifier_client'] %}active{% endif %}">
         <i class="bi bi-people-fill"></i> Clients
       </a>
-      <a href="{{ url_for('produits') }}" data-bs-dismiss="offcanvas"
+      <a href="{{ url_for('produits') }}"
          class="nav-link {% if request.endpoint in ['produits','ajouter_produit','modifier_produit'] %}active{% endif %}">
         <i class="bi bi-box-seam-fill"></i> Produits
       </a>
-      <a href="{{ url_for('ventes') }}" data-bs-dismiss="offcanvas"
+      <a href="{{ url_for('ventes') }}"
          class="nav-link {% if request.endpoint in ['ventes','detail_vente','nouvelle_vente'] %}active{% endif %}">
         <i class="bi bi-credit-card-2-front-fill"></i> Crédits non payés
       </a>
       <hr/>
-      <a href="{{ url_for('ventes', statut='solde') }}" data-bs-dismiss="offcanvas" class="nav-link">
+      <a href="{{ url_for('ventes', statut='solde') }}" class="nav-link">
         <i class="bi bi-check-circle-fill"></i> Crédits Soldés
       </a>
-      <a href="{{ url_for('ventes', statut='tous') }}" data-bs-dismiss="offcanvas" class="nav-link">
+      <a href="{{ url_for('ventes', statut='tous') }}" class="nav-link">
         <i class="bi bi-journal-text"></i> Tous les Crédits
       </a>
       <hr/>
-      <a href="{{ url_for('parametres') }}" data-bs-dismiss="offcanvas"
+      <a href="{{ url_for('parametres') }}"
          class="nav-link {% if request.endpoint == 'parametres' %}active{% endif %}">
         <i class="bi bi-gear-fill"></i> Paramètres
       </a>
