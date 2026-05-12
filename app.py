@@ -65,43 +65,42 @@ def inject_globals():
     skip = request.path.startswith(('/api/', '/static/', '/ping', '/sw.js', '/manifest.json', '/offline'))
     if not skip:
         try:
-        conn = get_db()
-        today = datetime.now().date()
-        rows = conn.execute("""
-            SELECT v.id, v.numero, v.date_vente,
-                   c.nom || ' ' || COALESCE(c.prenom,'') AS client_nom,
-                   c.telephone,
-                   (v.montant_total - v.montant_paye) AS reste,
-                   (CURRENT_DATE - v.date_vente::date)::integer AS jours
-            FROM ventes v
-            JOIN clients c ON c.id = v.client_id
-            WHERE v.statut = 'en_cours'
-            ORDER BY reste DESC
-            LIMIT 20
-        """ if USE_PG else """
-            SELECT v.id, v.numero, v.date_vente,
-                   c.nom || ' ' || COALESCE(c.prenom,'') AS client_nom,
-                   c.telephone,
-                   (v.montant_total - v.montant_paye) AS reste,
-                   CAST(julianday('now') - julianday(v.date_vente) AS INTEGER) AS jours
-            FROM ventes v
-            JOIN clients c ON c.id = v.client_id
-            WHERE v.statut = 'en_cours'
-            ORDER BY reste DESC
-            LIMIT 20
-        """).fetchall()
-        conn.close()
-        for r in rows:
-            niveau = 'danger' if r['jours'] >= 30 else ('warning' if r['jours'] >= 7 else 'info')
-            alertes.append({
-                'id': r['id'],
-                'numero': r['numero'],
-                'client': r['client_nom'].strip(),
-                'telephone': r['telephone'] or '',
-                'reste': r['reste'],
-                'jours': r['jours'],
-                'niveau': niveau,
-            })
+            conn = get_db()
+            rows = conn.execute("""
+                SELECT v.id, v.numero, v.date_vente,
+                       c.nom || ' ' || COALESCE(c.prenom,'') AS client_nom,
+                       c.telephone,
+                       (v.montant_total - v.montant_paye) AS reste,
+                       (CURRENT_DATE - v.date_vente::date)::integer AS jours
+                FROM ventes v
+                JOIN clients c ON c.id = v.client_id
+                WHERE v.statut = 'en_cours'
+                ORDER BY reste DESC
+                LIMIT 20
+            """ if USE_PG else """
+                SELECT v.id, v.numero, v.date_vente,
+                       c.nom || ' ' || COALESCE(c.prenom,'') AS client_nom,
+                       c.telephone,
+                       (v.montant_total - v.montant_paye) AS reste,
+                       CAST(julianday('now') - julianday(v.date_vente) AS INTEGER) AS jours
+                FROM ventes v
+                JOIN clients c ON c.id = v.client_id
+                WHERE v.statut = 'en_cours'
+                ORDER BY reste DESC
+                LIMIT 20
+            """).fetchall()
+            conn.close()
+            for r in rows:
+                niveau = 'danger' if r['jours'] >= 30 else ('warning' if r['jours'] >= 7 else 'info')
+                alertes.append({
+                    'id': r['id'],
+                    'numero': r['numero'],
+                    'client': r['client_nom'].strip(),
+                    'telephone': r['telephone'] or '',
+                    'reste': r['reste'],
+                    'jours': r['jours'],
+                    'niveau': niveau,
+                })
         except Exception:
             pass
     return {
