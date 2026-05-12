@@ -240,6 +240,13 @@ def init_db():
             """INSERT INTO parametres (id, nom_boutique, devise)
                VALUES (1, 'ART Gestion Crédit', 'FCFA')
                ON CONFLICT DO NOTHING""",
+            # Index pour accélérer les requêtes fréquentes
+            "CREATE INDEX IF NOT EXISTS idx_ventes_statut ON ventes(statut)",
+            "CREATE INDEX IF NOT EXISTS idx_ventes_client ON ventes(client_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ventes_creation ON ventes(date_creation DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_items_vente ON vente_items(vente_id)",
+            "CREATE INDEX IF NOT EXISTS idx_paiements_vente ON paiements(vente_id)",
+            "CREATE INDEX IF NOT EXISTS idx_clients_nom ON clients(nom)",
         ]
         for stmt in ddl:
             cur.execute(stmt)
@@ -304,6 +311,12 @@ def init_db():
             );
             INSERT OR IGNORE INTO parametres (id, nom_boutique, devise)
             VALUES (1, 'ART Gestion Crédit', 'FCFA');
+            CREATE INDEX IF NOT EXISTS idx_ventes_statut ON ventes(statut);
+            CREATE INDEX IF NOT EXISTS idx_ventes_client ON ventes(client_id);
+            CREATE INDEX IF NOT EXISTS idx_ventes_creation ON ventes(date_creation);
+            CREATE INDEX IF NOT EXISTS idx_items_vente ON vente_items(vente_id);
+            CREATE INDEX IF NOT EXISTS idx_paiements_vente ON paiements(vente_id);
+            CREATE INDEX IF NOT EXISTS idx_clients_nom ON clients(nom);
         ''')
         conn.commit()
         conn.close()
@@ -882,6 +895,32 @@ def api_creer_produit():
     conn.close()
     return jsonify({'id': pid, 'nom': nom, 'categorie': categorie,
                     'prix_unitaire': prix, 'description': description}), 201
+
+
+# ───────────────────────────────── PWA ─────────────────────────────────
+
+@app.route('/manifest.json')
+def pwa_manifest():
+    from flask import send_from_directory
+    resp = send_from_directory('static', 'manifest.json')
+    resp.headers['Content-Type'] = 'application/manifest+json'
+    return resp
+
+
+@app.route('/sw.js')
+def service_worker():
+    from flask import send_from_directory
+    resp = send_from_directory('static', 'sw.js')
+    resp.headers['Content-Type'] = 'application/javascript'
+    resp.headers['Service-Worker-Allowed'] = '/'
+    resp.headers['Cache-Control'] = 'no-cache'
+    return resp
+
+
+@app.route('/offline')
+def offline_page():
+    from flask import send_from_directory
+    return send_from_directory('static', 'offline.html')
 
 
 # ───────────────────────────────── MAIN ─────────────────────────────────

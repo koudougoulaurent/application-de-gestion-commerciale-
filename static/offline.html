@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Hors ligne — ART Gestion Crédit</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{
+      font-family:'Segoe UI',Arial,sans-serif;
+      background:linear-gradient(135deg,#1b5e20 0%,#2e7d32 100%);
+      min-height:100vh;display:flex;align-items:center;justify-content:center;
+      color:#fff;padding:20px;
+    }
+    .card{
+      background:#fff;color:#1e293b;border-radius:16px;
+      padding:40px 32px;max-width:420px;width:100%;
+      text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25);
+    }
+    .icon{font-size:3.5rem;margin-bottom:16px;display:block;}
+    h1{font-size:1.4rem;font-weight:800;color:#1b5e20;margin-bottom:8px;}
+    p{color:#64748b;font-size:.9rem;line-height:1.6;margin-bottom:24px;}
+    .btn{
+      display:inline-block;background:#1b5e20;color:#fff;
+      padding:11px 28px;border-radius:8px;text-decoration:none;
+      font-weight:600;font-size:.9rem;border:none;cursor:pointer;
+      transition:background .2s;
+    }
+    .btn:hover{background:#2e7d32;}
+    .hint{
+      margin-top:20px;font-size:.78rem;color:#94a3b8;
+      background:#f8fafc;border-radius:8px;padding:10px 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="icon">📶</span>
+    <h1>Vous êtes hors ligne</h1>
+    <p>Vérifiez votre connexion internet.<br>Les données enregistrées restent accessibles.</p>
+    <button class="btn" onclick="window.location.reload()">Réessayer</button>
+    <div class="hint">
+      Si vous avez déjà visité des pages, elles peuvent être disponibles en cache.
+    </div>
+  </div>
+</body>
+</html>

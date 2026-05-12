@@ -1,0 +1,47 @@
+{
+  "name": "ART Gestion Crédit",
+  "short_name": "ART Crédit",
+  "description": "Gestion des crédits commerciaux — ART Technologies/Business",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#1b5e20",
+  "theme_color": "#1b5e20",
+  "orientation": "portrait-primary",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/static/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nouveau Crédit",
+      "short_name": "Crédit",
+      "url": "/ventes/nouvelle",
+      "description": "Enregistrer un nouveau crédit"
+    },
+    {
+      "name": "Clients",
+      "short_name": "Clients",
+      "url": "/clients",
+      "description": "Liste des clients"
+    },
+    {
+      "name": "Crédits non payés",
+      "short_name": "Non payés",
+      "url": "/ventes",
+      "description": "Voir les crédits non payés"
+    }
+  ],
+  "categories": ["business", "finance", "productivity"]
+}
