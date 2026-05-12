@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, abort
+from flask_compress import Compress
 import os
 import re
 import secrets
@@ -9,14 +10,22 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+# Compression gzip des réponses HTML/JSON
+app.config['COMPRESS_MIMETYPES'] = ['text/html','text/css','application/json','application/javascript']
+app.config['COMPRESS_LEVEL'] = 6
+app.config['COMPRESS_MIN_SIZE'] = 500
+Compress(app)
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 DB_PATH = os.path.join(os.path.dirname(__file__), 'gafarou.db')
 USE_PG = bool(DATABASE_URL)
 
+_pg_pool = None   # pool de connexions PostgreSQL (initialisé une fois par worker)
+
 if USE_PG:
     import psycopg2
     import psycopg2.extras
+    from psycopg2 import pool as _pg_pool_lib
 
 
 # ───────────── SÉCURITÉ ─────────────
@@ -43,13 +52,19 @@ def set_security_headers(resp):
     resp.headers['X-Content-Type-Options'] = 'nosniff'
     resp.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     resp.headers['X-XSS-Protection'] = '1; mode=block'
+    # Cache agressif pour les fichiers statiques (logo, sw.js, manifest)
+    if request.path.startswith('/static/') and request.path != '/static/sw.js':
+        resp.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
     return resp
 
 
 @app.context_processor
 def inject_globals():
     alertes = []
-    try:
+    # Éviter une requête DB inutile sur les appels AJAX/API/static
+    skip = request.path.startswith(('/api/', '/static/', '/ping', '/sw.js', '/manifest.json', '/offline'))
+    if not skip:
+        try:
         conn = get_db()
         today = datetime.now().date()
         rows = conn.execute("""
@@ -87,8 +102,8 @@ def inject_globals():
                 'jours': r['jours'],
                 'niveau': niveau,
             })
-    except Exception:
-        pass
+        except Exception:
+            pass
     return {
         'csrf_token': session.get('csrf_token', ''),
         'alertes': alertes,
@@ -169,15 +184,33 @@ class _PgConn:
         self._c.commit()
 
     def close(self):
-        self._c.close()
+        # Remettre la connexion dans le pool au lieu de la fermer
+        global _pg_pool
+        if _pg_pool:
+            self._c.autocommit = False
+            _pg_pool.putconn(self._c)
+        else:
+            self._c.close()
+
+
+def _get_pg_pool():
+    """Retourne le pool PostgreSQL, l'initialise si nécessaire (lazy)."""
+    global _pg_pool
+    if _pg_pool is None:
+        _pg_pool = _pg_pool_lib.SimpleConnectionPool(1, 8, DATABASE_URL)
+    return _pg_pool
 
 
 def get_db():
     if USE_PG:
-        return _PgConn(psycopg2.connect(DATABASE_URL))
+        conn = _get_pg_pool().getconn()
+        conn.autocommit = False
+        return _PgConn(conn)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA cache_size = -8000")
     return _SqliteConn(conn)
 
 
@@ -895,6 +928,11 @@ def api_creer_produit():
     conn.close()
     return jsonify({'id': pid, 'nom': nom, 'categorie': categorie,
                     'prix_unitaire': prix, 'description': description}), 201
+
+
+@app.route('/ping')
+def ping():
+    return '', 204
 
 
 # ───────────────────────────────── PWA ─────────────────────────────────

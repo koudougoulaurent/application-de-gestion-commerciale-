@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const STATIC_CACHE  = 'art-static-' + CACHE_VERSION;
 const PAGES_CACHE   = 'art-pages-'  + CACHE_VERSION;
 
@@ -20,7 +20,7 @@ self.addEventListener('install', event => {
   );
 });
 
-// ── Activation : suppression des anciens caches ───────────────────────────────
+// ── Keep-alive : empêche Render de mettre l'app en veille pendant utilisation ──
 self.addEventListener('activate', event => {
   const keep = [STATIC_CACHE, PAGES_CACHE];
   event.waitUntil(
@@ -29,6 +29,10 @@ self.addEventListener('activate', event => {
         keys.filter(k => !keep.includes(k)).map(k => caches.delete(k))
       ))
       .then(() => self.clients.claim())
+      .then(() => {
+        // Ping toutes les 10 min pour maintenir le serveur actif
+        setInterval(() => fetch('/ping', { cache: 'no-store' }).catch(() => {}), 10 * 60 * 1000);
+      })
   );
 });
 
