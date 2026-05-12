@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}Paramètres{% endblock %}
+{% block page_title %}Paramètres de la Boutique{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-gear-fill me-2 text-primary"></i>Informations de la boutique
+      </div>
+      <div class="card-body p-4">
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Nom de la boutique <span class="text-danger">*</span></label>
+              <input type="text" name="nom_boutique" class="form-control"
+                     value="{{ params.nom_boutique }}" required
+                     placeholder="Ex: Gafarou Électroniques">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Nom du propriétaire</label>
+              <input type="text" name="proprietaire" class="form-control"
+                     value="{{ params.proprietaire }}"
+                     placeholder="Ex: Amadou Gafarou">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Adresse</label>
+              <textarea name="adresse_boutique" class="form-control" rows="2"
+                        placeholder="Quartier, ville, pays…">{{ params.adresse_boutique }}</textarea>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Téléphone</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-telephone-fill"></i></span>
+                <input type="tel" name="telephone_boutique" class="form-control"
+                       value="{{ params.telephone_boutique }}"
+                       placeholder="Ex: +225 07 00 00 00 00">
+              </div>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Devise</label>
+              <select name="devise" class="form-select">
+                {% for d in ['FCFA','XOF','GNF','USD','EUR','MAD','DZD'] %}
+                <option value="{{ d }}" {% if params.devise == d %}selected{% endif %}>{{ d }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <hr class="my-4"/>
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-check-circle me-1"></i>Enregistrer les paramètres
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header text-muted"><i class="bi bi-info-circle me-2"></i>À propos</div>
+      <div class="card-body text-muted small">
+        <p class="mb-1"><strong>Système de Gestion des Crédits</strong> v1.0</p>
+        <p class="mb-0">Développé pour les commerçants vendeurs d'accessoires électroniques et téléphones.</p>
+        <p class="mb-0 mt-1">Base de données : SQLite locale — vos données restent sur votre ordinateur.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

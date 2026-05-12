@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Reçu {{ vente.numero }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <style>
+    *{ box-sizing:border-box; }
+    body{ background:#f4f6f8; font-family:'Segoe UI',Arial,sans-serif; color:#1e293b; }
+
+    .recu-wrap{
+      max-width:700px; margin:24px auto;
+      background:#fff; border:1px solid #d1d9e0;
+      border-radius:4px;
+    }
+
+    /* En-tête */
+    .recu-header{
+      background:#1b2a40; color:#fff;
+      padding:22px 30px 18px;
+    }
+    .recu-header .shop-name{
+      font-size:1.25rem; font-weight:700; letter-spacing:.02em;
+      margin:0 0 2px;
+    }
+    .recu-header .shop-info{
+      font-size:.8rem; opacity:.7; margin:2px 0;
+    }
+    .recu-header .doc-ref{
+      text-align:right;
+    }
+    .recu-header .doc-ref .num{
+      font-size:1rem; font-weight:700;
+      background:rgba(255,255,255,.12); border-radius:3px;
+      padding:5px 12px; display:inline-block;
+      letter-spacing:.04em;
+    }
+    .recu-header .doc-ref small{
+      display:block; margin-top:4px; font-size:.72rem; opacity:.6;
+    }
+
+    /* Stamp statut */
+    .stamp{
+      display:inline-block; padding:3px 14px;
+      border-radius:2px; font-weight:800;
+      font-size:.82rem; letter-spacing:.06em;
+      text-transform:uppercase;
+    }
+    .stamp-solde{
+      border:2px solid #2e7d32; color:#2e7d32;
+    }
+    .stamp-nonpaye{
+      border:2px solid #b45309; color:#b45309;
+    }
+
+    /* Corps */
+    .recu-body{ padding:24px 30px; }
+
+    .doc-title{
+      text-align:center; margin-bottom:22px;
+      border-bottom:2px solid #1b2a40; padding-bottom:12px;
+    }
+    .doc-title h4{
+      font-size:1rem; font-weight:700; letter-spacing:.06em;
+      text-transform:uppercase; margin:0 0 4px; color:#1b2a40;
+    }
+    .doc-title p{ font-size:.82rem; color:#64748b; margin:0; }
+
+    /* Section titres */
+    .sec-title{
+      font-size:.68rem; text-transform:uppercase; letter-spacing:.08em;
+      color:#64748b; font-weight:700; margin:0 0 8px;
+      padding-bottom:4px; border-bottom:1px solid #e2e8f0;
+    }
+
+    /* Client */
+    .client-block{
+      background:#f8fafc; border:1px solid #e2e8f0;
+      border-left:3px solid #1b2a40;
+      border-radius:3px; padding:10px 14px; margin-bottom:20px;
+    }
+    .client-block .cname{ font-size:1rem; font-weight:700; }
+    .client-block .cdet{ font-size:.8rem; color:#64748b; margin-top:3px; }
+
+    /* Tableaux */
+    .recu-table{ width:100%; border-collapse:collapse; font-size:.85rem; }
+    .recu-table th{
+      background:#f1f5f9; color:#475569;
+      font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;
+      padding:7px 10px; border-bottom:2px solid #d1d9e0;
+      text-align:left;
+    }
+    .recu-table th.r, .recu-table td.r{ text-align:right; }
+    .recu-table th.c, .recu-table td.c{ text-align:center; }
+    .recu-table td{
+      padding:7px 10px; border-bottom:1px solid #f0f4f8;
+      vertical-align:middle;
+    }
+    .recu-table tbody tr:last-child td{ border-bottom:none; }
+    .recu-table tfoot td{
+      background:#f1f5f9; font-weight:700; padding:9px 10px;
+      border-top:2px solid #d1d9e0; text-align:right;
+    }
+
+    /* Résumé */
+    .summary-box{
+      background:#f8fafc; border:1px solid #e2e8f0;
+      border-radius:3px; padding:14px 16px;
+    }
+    .sum-row{
+      display:flex; justify-content:space-between;
+      padding:4px 0; font-size:.85rem;
+    }
+    .sum-row.total-row{
+      border-top:1px solid #d1d9e0; margin-top:6px; padding-top:8px;
+      font-size:.95rem; font-weight:700;
+    }
+    .sum-row.total-row.paye{ color:#1b5e20; }
+    .sum-row.total-row.due{ color:#b45309; }
+
+    /* Observations */
+    .obs-block{
+      margin-top:16px; padding:10px 14px;
+      background:#f8fafc; border:1px solid #e2e8f0;
+      border-radius:3px; font-size:.82rem; color:#475569;
+    }
+
+    /* Signatures */
+    .sig-area{
+      display:grid; grid-template-columns:1fr 1fr; gap:30px; margin-top:24px;
+    }
+    .sig-box{
+      border-top:1px solid #94a3b8; padding-top:8px;
+      text-align:center; font-size:.78rem; color:#64748b;
+    }
+    .sig-box strong{ display:block; margin-top:4px; color:#334155; font-size:.82rem; }
+
+    /* Pied de page */
+    .recu-footer{
+      background:#f1f5f9; border-top:1px solid #e2e8f0;
+      padding:10px 30px; text-align:center;
+      font-size:.72rem; color:#94a3b8;
+    }
+
+    /* Boutons impression */
+    .print-bar{
+      max-width:700px; margin:0 auto 12px;
+      display:flex; gap:8px; justify-content:flex-end; padding:0 4px;
+    }
+
+    @media print{
+      body{ background:#fff !important; }
+      .print-bar{ display:none !important; }
+      .recu-wrap{ border:none !important; margin:0 !important; border-radius:0 !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="print-bar">
+  <a href="{{ url_for('detail_vente', vid=vente.id) }}"
+     class="btn btn-sm btn-outline-secondary">
+    Retour
+  </a>
+  <button onclick="window.print()" class="btn btn-sm btn-dark">
+    Imprimer / PDF
+  </button>
+</div>
+
+<div class="recu-wrap">
+
+  <!-- EN-TETE -->
+  <div class="recu-header">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div>
+        <p class="shop-name">{{ params.nom_boutique }}</p>
+        {% if params.adresse_boutique %}<p class="shop-info">{{ params.adresse_boutique }}</p>{% endif %}
+        {% if params.telephone_boutique %}<p class="shop-info">Tél. : {{ params.telephone_boutique }}</p>{% endif %}
+        {% if params.proprietaire %}<p class="shop-info">Responsable : {{ params.proprietaire }}</p>{% endif %}
+      </div>
+      <div class="doc-ref">
+        <div class="num">N° {{ vente.numero }}</div>
+        <small>Imprimé le {{ now_str }}</small>
+        <div class="mt-2">
+          {% if vente.statut == 'solde' %}
+          <span class="stamp stamp-solde">Soldé</span>
+          {% else %}
+          <span class="stamp stamp-nonpaye">Non payé</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="recu-body">
+
+    <!-- TITRE DU DOCUMENT -->
+    <div class="doc-title">
+      <h4>Reçu de {% if vente.statut=='solde' %}règlement complet{% else %}crédit{% endif %}</h4>
+      <p>Date de la vente : <strong>{{ vente.date_vente|fmt_date }}</strong></p>
+    </div>
+
+    <!-- CLIENT -->
+    <p class="sec-title">Client</p>
+    <div class="client-block mb-4">
+      <div class="cname">{{ vente.client_nom }} {{ vente.client_prenom }}</div>
+      <div class="cdet d-flex flex-wrap gap-3">
+        {% if vente.client_telephone %}
+        <span>Tél. : {{ vente.client_telephone }}</span>
+        {% endif %}
+        {% if vente.client_adresse %}
+        <span>Adresse : {{ vente.client_adresse }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ARTICLES -->
+    <p class="sec-title">Articles achetés</p>
+    <table class="recu-table mb-4">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Désignation</th>
+          <th class="c">Qté</th>
+          <th class="r">Prix unit.</th>
+          <th class="r">Sous-total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td class="text-muted small">{{ loop.index }}</td>
+          <td><strong>{{ item.produit_nom }}</strong></td>
+          <td class="c">{{ item.quantite }}</td>
+          <td class="r">{{ item.prix_unitaire|fmt_money }} {{ params.devise }}</td>
+          <td class="r" style="font-weight:600;">
+            {{ (item.quantite * item.prix_unitaire)|fmt_money }} {{ params.devise }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="4">Total crédit</td>
+          <td class="r" style="color:#1b2a40;">
+            {{ vente.montant_total|fmt_money }} {{ params.devise }}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <!-- PAIEMENTS -->
+    {% if paiements %}
+    <p class="sec-title">Historique des versements</p>
+    <table class="recu-table mb-4">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Date</th>
+          <th>Notes</th>
+          <th class="r">Montant versé</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in paiements %}
+        <tr>
+          <td class="text-muted small">{{ loop.index }}</td>
+          <td>{{ p.date_paiement|fmt_date }}</td>
+          <td class="text-muted small">{{ p.notes or '—' }}</td>
+          <td class="r" style="font-weight:600; color:#1b5e20;">
+            +{{ p.montant|fmt_money }} {{ params.devise }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    <!-- RÉSUMÉ FINANCIER -->
+    <div class="row">
+      <div class="col-md-6 offset-md-6">
+        <div class="summary-box">
+          <div class="sum-row">
+            <span>Montant total</span>
+            <strong>{{ vente.montant_total|fmt_money }} {{ params.devise }}</strong>
+          </div>
+          <div class="sum-row">
+            <span>Total versé</span>
+            <strong style="color:#1b5e20;">{{ vente.montant_paye|fmt_money }} {{ params.devise }}</strong>
+          </div>
+          {% if vente.statut=='solde' %}
+          <div class="sum-row total-row paye">
+            <span>Solde restant</span>
+            <strong>0 {{ params.devise }} — Soldé</strong>
+          </div>
+          {% else %}
+          <div class="sum-row total-row due">
+            <span>Reste à payer</span>
+            <strong>{{ reste|fmt_money }} {{ params.devise }}</strong>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if vente.notes %}
+    <div class="obs-block mt-3">
+      <strong>Observations :</strong> {{ vente.notes }}
+    </div>
+    {% endif %}
+
+    <!-- SIGNATURES -->
+    <div class="sig-area">
+      <div class="sig-box">
+        <div style="height:48px;"></div>
+        Signature du vendeur
+        <strong>{{ params.proprietaire or params.nom_boutique }}</strong>
+      </div>
+      <div class="sig-box">
+        <div style="height:48px;"></div>
+        Signature du client
+        <strong>{{ vente.client_nom }} {{ vente.client_prenom }}</strong>
+      </div>
+    </div>
+
+  </div><!-- /recu-body -->
+
+  <div class="recu-footer">
+    Document établi par <strong>{{ params.nom_boutique }}</strong> —
+    Conservez ce reçu.
+  </div>
+
+</div><!-- /recu-wrap -->
+</body>
+</html>

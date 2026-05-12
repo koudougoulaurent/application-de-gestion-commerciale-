@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+{% block title %}Crédits{% endblock %}
+{% block page_title %}
+  {% if statut == 'en_cours' %}Crédits non payés
+  {% elif statut == 'solde' %}Crédits Soldés
+  {% else %}Tous les Crédits{% endif %}
+{% endblock %}
+
+{% block content %}
+<!-- Filtres -->
+<div class="card mb-3">
+  <div class="card-body py-2 px-3 d-flex flex-wrap gap-2 justify-content-between align-items-center">
+    <div class="d-flex gap-1">
+      <a href="{{ url_for('ventes', statut='en_cours') }}"
+         class="btn btn-sm {% if statut=='en_cours' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+        <i class="bi bi-hourglass-split me-1"></i>Non payés
+      </a>
+      <a href="{{ url_for('ventes', statut='solde') }}"
+         class="btn btn-sm {% if statut=='solde' %}btn-success{% else %}btn-outline-secondary{% endif %}">
+        <i class="bi bi-check-circle me-1"></i>Soldés
+      </a>
+      <a href="{{ url_for('ventes', statut='tous') }}"
+         class="btn btn-sm {% if statut=='tous' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        <i class="bi bi-list me-1"></i>Tous
+      </a>
+    </div>
+    <form class="search-box" method="get">
+      <input type="hidden" name="statut" value="{{ statut }}">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text border-end-0"><i class="bi bi-search text-muted"></i></span>
+        <input type="text" name="q" value="{{ search }}" placeholder="Client ou N° crédit…"
+               class="form-control border-start-0" style="width:200px;">
+        <button class="btn btn-outline-secondary">OK</button>
+        {% if search %}<a href="{{ url_for('ventes', statut=statut) }}" class="btn btn-outline-danger">✕</a>{% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if statut == 'en_cours' and total_du > 0 %}
+<div class="alert alert-warning rounded-3 d-flex align-items-center gap-2 py-2" role="alert">
+  <i class="bi bi-exclamation-triangle-fill"></i>
+  <strong>Montant total à recouvrer :</strong>
+  {{ total_du|fmt_money }} {{ params.devise }}
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if ventes %}
+    <div class="table-responsive">
+      <table class="table table-hover table-mobile mb-0">
+        <thead>
+          <tr>
+            <th class="ps-3">N° Crédit</th>
+            <th>Client</th>
+            <th>Date vente</th>
+            <th class="text-end">Total</th>
+            <th class="text-end">Payé</th>
+            <th class="text-end">Reste</th>
+            <th>Statut</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in ventes %}
+          <tr>
+            <td class="ps-3">
+              <span class="fw-semibold text-muted small">{{ v.numero }}</span>
+            </td>
+            <td>
+              <span class="fw-semibold" style="font-size:.875rem;">{{ v.client_nom }}</span><br>
+              <small class="text-muted"><i class="bi bi-telephone me-1"></i>{{ v.telephone }}</small>
+            </td>
+            <td class="text-muted small">{{ v.date_vente|fmt_date }}</td>
+            <td class="text-end fw-semibold">
+              {{ v.montant_total|fmt_money }} <small class="text-muted">{{ params.devise }}</small>
+            </td>
+            <td class="text-end text-success">{{ v.montant_paye|fmt_money }}</td>
+            <td class="text-end fw-bold {% if v.statut=='en_cours' %}text-danger{% else %}text-success{% endif %}">
+              {% if v.statut=='en_cours' %}{{ (v.montant_total-v.montant_paye)|fmt_money }}
+              {% else %}0{% endif %}
+            </td>
+            <td>
+              <span class="badge badge-{{ v.statut }} rounded-pill px-2 py-1">
+                {% if v.statut=='en_cours' %}Non payé{% else %}Soldé{% endif %}
+              </span>
+            </td>
+            <td class="pe-3">
+              <a href="{{ url_for('detail_vente', vid=v.id) }}"
+                 class="btn btn-sm btn-outline-primary me-1" title="Détail">
+                <i class="bi bi-eye"></i>
+              </a>
+              <a href="{{ url_for('recu', vid=v.id) }}"
+                 class="btn btn-sm btn-outline-secondary" title="Reçu">
+                <i class="bi bi-receipt"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <i class="bi bi-credit-card"></i>
+      {% if search %}Aucun résultat pour « {{ search }} »
+      {% elif statut=='en_cours' %}Aucun crédit non payé — tout est soldé !
+      {% elif statut=='solde' %}Aucun crédit soldé pour l'instant.
+      {% else %}Aucun crédit enregistré.{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

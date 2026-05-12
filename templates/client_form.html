@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}{% if client %}Modifier Client{% else %}Nouveau Client{% endif %}{% endblock %}
+{% block page_title %}{% if client %}Modifier Client{% else %}Nouveau Client{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-person-fill me-2 text-primary"></i>
+        {% if client %}Modifier : {{ client.nom }} {{ client.prenom }}{% else %}Ajouter un nouveau client{% endif %}
+      </div>
+      <div class="card-body p-4">
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label fw-semibold">Nom <span class="text-danger">*</span></label>
+              <input type="text" name="nom" class="form-control"
+                     value="{{ client.nom if client else '' }}"
+                     placeholder="Nom de famille" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Prénom</label>
+              <input type="text" name="prenom" class="form-control"
+                     value="{{ client.prenom if client else '' }}"
+                     placeholder="Prénom">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Téléphone</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-telephone-fill"></i></span>
+                <input type="tel" name="telephone" class="form-control"
+                       value="{{ client.telephone if client else '' }}"
+                       placeholder="Ex : 07 00 00 00 00"
+                       inputmode="tel">
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Adresse</label>
+              <textarea name="adresse" class="form-control" rows="2"
+                        placeholder="Quartier, ville…">{{ client.adresse if client else '' }}</textarea>
+            </div>
+          </div>
+          <hr class="my-4"/>
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="{{ url_for('clients') }}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left me-1"></i>Annuler
+            </a>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle me-1"></i>
+              {% if client %}Enregistrer les modifications{% else %}Ajouter le client{% endif %}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

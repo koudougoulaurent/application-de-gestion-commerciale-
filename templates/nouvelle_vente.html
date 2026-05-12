@@ -1,0 +1,657 @@
+{% extends 'base.html' %}
+{% block title %}Nouveau Crédit{% endblock %}
+{% block page_title %}Enregistrer un nouveau crédit{% endblock %}
+
+{% block content %}
+<form method="post" id="formVente">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<div class="row g-3">
+
+  <!-- ─── Colonne gauche : client + dates ─── -->
+  <div class="col-lg-4">
+
+    <!-- Client -->
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-person-fill me-2 text-primary"></i>Client</span>
+        <button type="button" class="btn btn-sm btn-success py-0 px-2"
+                data-bs-toggle="modal" data-bs-target="#modalClient">
+          <i class="bi bi-person-plus-fill me-1"></i><span class="d-none d-sm-inline">Nouveau</span>
+        </button>
+      </div>
+      <div class="card-body">
+        <!-- Zone recherche -->
+        <div id="zone_recherche" style="position:relative;">
+          <div class="input-group">
+            <span class="input-group-text bg-white border-end-0">
+              <i class="bi bi-search text-muted"></i>
+            </span>
+            <input type="text" id="client_search"
+                   class="form-control border-start-0"
+                   placeholder="Tapez nom ou téléphone…"
+                   autocomplete="off" autocorrect="off" spellcheck="false">
+          </div>
+          <div id="client_dropdown" class="list-group shadow"
+               style="display:none;position:absolute;width:100%;max-height:220px;
+                      overflow-y:auto;z-index:600;border-radius:0 0 8px 8px;
+                      border:1px solid #e2e8f0;border-top:none;"></div>
+        </div>
+        <!-- Client confirmé -->
+        <div id="client_ok" class="d-none mt-2 p-2 rounded-3
+             border border-success-subtle bg-success bg-opacity-10">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div>
+              <i class="bi bi-person-check-fill text-success"></i>
+              <span id="client_ok_nom" class="fw-bold text-success ms-1"></span><br>
+              <small id="client_ok_tel" class="text-muted ms-3"></small>
+            </div>
+            <button type="button" id="btn_changer_client"
+                    class="btn btn-sm btn-outline-secondary flex-shrink-0 py-0 px-2">
+              Changer
+            </button>
+          </div>
+        </div>
+        <input type="hidden" name="client_id" id="client_id_hidden">
+      </div>
+    </div>
+
+    <!-- Date & Versement -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-calendar3 me-2 text-primary"></i>Date & Versement</div>
+      <div class="card-body">
+        <label class="form-label fw-semibold small">Date de la vente</label>
+        <input type="date" name="date_vente" class="form-control mb-3"
+               value="{{ today }}" required>
+        <label class="form-label fw-semibold small">Versement initial ({{ params.devise }})</label>
+        <div class="input-group mb-3">
+          <input type="number" name="montant_paye_initial" id="inp_initial"
+                 class="form-control" placeholder="0" min="0" step="1"
+                 value="0" inputmode="numeric">
+          <span class="input-group-text">{{ params.devise }}</span>
+        </div>
+        <label class="form-label fw-semibold small">Notes</label>
+        <textarea name="notes" class="form-control" rows="2"
+                  placeholder="Modèle, couleur, conditions…"></textarea>
+      </div>
+    </div>
+
+    <!-- Résumé financier -->
+    <div class="card border-primary">
+      <div class="card-body py-3 px-3">
+        <div class="text-center mb-2">
+          <p class="text-muted small mb-1 text-uppercase" style="letter-spacing:.05em;">Total crédit</p>
+          <h3 class="fw-black text-primary mb-0" id="lbl_total">0</h3>
+          <small class="text-muted">{{ params.devise }}</small>
+        </div>
+        <hr class="my-2">
+        <div class="d-flex justify-content-between small mb-1">
+          <span class="text-muted">Versement initial</span>
+          <strong class="text-success" id="lbl_initial">0 {{ params.devise }}</strong>
+        </div>
+        <div class="d-flex justify-content-between small">
+          <span class="text-muted">Reste à payer</span>
+          <strong id="lbl_reste" class="text-danger">0 {{ params.devise }}</strong>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /col gauche -->
+
+  <!-- ─── Colonne droite : articles ─── -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span><i class="bi bi-cart3 me-2 text-primary"></i>Articles achetés</span>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sm btn-outline-success"
+                  data-bs-toggle="modal" data-bs-target="#modalProduit"
+                  id="btn_new_produit">
+            <i class="bi bi-plus-square me-1"></i><span class="d-none d-sm-inline">Nouvel article</span>
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="btn_add_row">
+            <i class="bi bi-plus-circle me-1"></i><span class="d-none d-sm-inline">Ajouter ligne</span>
+          </button>
+        </div>
+      </div>
+      <div class="card-body p-2">
+        <!-- Desktop -->
+        <div class="table-responsive d-none d-md-block">
+          <table class="table mb-0">
+            <thead>
+              <tr>
+                <th style="min-width:200px">Article</th>
+                <th style="width:80px">Qté</th>
+                <th style="width:150px">Prix ({{ params.devise }})</th>
+                <th class="text-end" style="width:130px">Sous-total</th>
+                <th style="width:40px"></th>
+              </tr>
+            </thead>
+            <tbody id="rows_body"></tbody>
+          </table>
+        </div>
+        <!-- Mobile cards -->
+        <div id="rows_mobile" class="d-md-none"></div>
+        <div class="px-2 pb-1 text-muted" style="font-size:.78rem;">
+          <i class="bi bi-lightbulb me-1 text-warning"></i>
+          Choisissez dans le catalogue ou tapez librement. <strong>Nouvel article</strong> pour l'enregistrer.
+        </div>
+      </div>
+    </div>
+    <div class="d-flex gap-2 justify-content-end mt-3">
+      <a href="{{ url_for('ventes') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-x-circle me-1"></i>Annuler
+      </a>
+      <button type="submit" class="btn btn-primary btn-lg px-4">
+        <i class="bi bi-check-circle me-1"></i>Enregistrer le crédit
+      </button>
+    </div>
+  </div>
+
+</div>
+</form>
+
+
+<!-- ══════════ MODAL NOUVEAU CLIENT ══════════ -->
+<div class="modal fade" id="modalClient" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header"
+           style="background:linear-gradient(135deg,#1b5e20,#388e3c);color:#fff;">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-person-plus-fill me-2"></i>Nouveau Client
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div id="client_modal_err" class="alert alert-danger d-none py-2 mb-3"></div>
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="form-label fw-semibold small">Nom <span class="text-danger">*</span></label>
+            <input type="text" id="mc_nom" class="form-control"
+                   placeholder="Nom de famille" autocapitalize="words">
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-semibold small">Prénom</label>
+            <input type="text" id="mc_prenom" class="form-control"
+                   placeholder="Prénom" autocapitalize="words">
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold small">Téléphone</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="bi bi-telephone-fill"></i></span>
+              <input type="tel" id="mc_telephone" class="form-control"
+                     placeholder="07 00 00 00 00" inputmode="tel">
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold small">Adresse / Quartier</label>
+            <input type="text" id="mc_adresse" class="form-control"
+                   placeholder="Ex : Cocody, Abidjan">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" id="btn_save_client" class="btn btn-success px-4">
+          <i class="bi bi-check-circle me-1"></i>Créer & Sélectionner
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════ MODAL NOUVEL ARTICLE ══════════ -->
+<div class="modal fade" id="modalProduit" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header"
+           style="background:linear-gradient(135deg,#0d47a1,#1976d2);color:#fff;">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-plus-square-fill me-2"></i>Nouvel Article
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div id="produit_modal_err" class="alert alert-danger d-none py-2 mb-3"></div>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label fw-semibold small">Nom de l'article <span class="text-danger">*</span></label>
+            <input type="text" id="mp_nom" class="form-control"
+                   placeholder="Ex : iPhone 15, Écouteurs Samsung…">
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-semibold small">Catégorie</label>
+            <input type="text" id="mp_cat" class="form-control" list="mp_cat_list"
+                   placeholder="Téléphone, Accessoire…">
+            <datalist id="mp_cat_list">
+              <option value="Téléphone">
+              <option value="Tablette">
+              <option value="Accessoire">
+              <option value="Écouteurs / Casque">
+              <option value="Chargeur / Câble">
+              <option value="Coque / Protection">
+              <option value="Montre connectée">
+            </datalist>
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-semibold small">Prix unitaire</label>
+            <div class="input-group">
+              <input type="number" id="mp_prix" class="form-control"
+                     placeholder="0" min="0" step="1" inputmode="numeric">
+              <span class="input-group-text">{{ params.devise }}</span>
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold small">Description (optionnel)</label>
+            <input type="text" id="mp_desc" class="form-control"
+                   placeholder="Couleur, capacité, variante…">
+          </div>
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="mp_add_row" checked>
+              <label class="form-check-label small" for="mp_add_row">
+                Ajouter automatiquement dans la commande
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" id="btn_save_produit" class="btn btn-primary px-4">
+          <i class="bi bi-check-circle me-1"></i>Créer & Ajouter
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script id="produits_data" type="application/json">{{ produits | tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  'use strict';
+  const DEVISE = "{{ params.devise }}";
+  const produits = JSON.parse(document.getElementById('produits_data').textContent)
+    .map(p => ({ id: p.id, nom: p.nom, prix: p.prix_unitaire, cat: p.categorie||'' }));
+
+  /* ── utilitaires ── */
+  function fmtNum(n){
+    return Math.round(Number(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+  }
+  function escHtml(s){
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ═══════════ RECHERCHE CLIENT ═══════════ */
+  const searchInput   = document.getElementById('client_search');
+  const dropdown      = document.getElementById('client_dropdown');
+  const hiddenId      = document.getElementById('client_id_hidden');
+  const zoneRecherche = document.getElementById('zone_recherche');
+  const clientOk      = document.getElementById('client_ok');
+  const clientOkNom   = document.getElementById('client_ok_nom');
+  const clientOkTel   = document.getElementById('client_ok_tel');
+  const btnChanger    = document.getElementById('btn_changer_client');
+  let searchTimer = null;
+
+  function renderDropdown(clients, q){
+    if(!clients.length){
+      dropdown.innerHTML =
+        `<div class="list-group-item py-2 d-flex justify-content-between align-items-center gap-2">
+           <small class="text-muted">Aucun résultat${q ? ' pour «\u00a0'+escHtml(q)+'\u00a0»':''}</small>
+           <button type="button" class="btn btn-sm btn-success py-0 px-2 flex-shrink-0"
+                   id="dd_new_client" data-name="${escHtml(q)}">
+             <i class="bi bi-person-plus-fill me-1"></i>Créer
+           </button>
+         </div>`;
+      document.getElementById('dd_new_client')?.addEventListener('click', () => {
+        dropdown.style.display = 'none';
+        document.getElementById('mc_nom').value       = q||'';
+        document.getElementById('mc_prenom').value    = '';
+        document.getElementById('mc_telephone').value = '';
+        document.getElementById('mc_adresse').value   = '';
+        document.getElementById('client_modal_err').classList.add('d-none');
+        bootstrap.Modal.getOrCreateInstance(
+          document.getElementById('modalClient')).show();
+        setTimeout(()=>{ const f=document.getElementById('mc_nom');
+          f.setSelectionRange(f.value.length,f.value.length); f.focus(); }, 400);
+      });
+    } else {
+      dropdown.innerHTML = clients.map(c=>
+        `<button type="button"
+                 class="list-group-item list-group-item-action py-2 px-3"
+                 data-id="${c.id}"
+                 data-nom="${escHtml(c.nom+' '+(c.prenom||''))}"
+                 data-tel="${escHtml(c.telephone||'')}">
+           <strong>${escHtml(c.nom)} ${escHtml(c.prenom||'')}</strong>
+           ${c.telephone
+             ? `<span class="text-muted ms-2 small"><i class="bi bi-telephone-fill me-1"></i>${escHtml(c.telephone)}</span>`
+             : ''}
+         </button>`
+      ).join('');
+      dropdown.querySelectorAll('[data-id]').forEach(btn=>
+        btn.addEventListener('mousedown', e=>{
+          e.preventDefault();
+          selectClient(btn.dataset.id, btn.dataset.nom, btn.dataset.tel);
+        })
+      );
+    }
+    dropdown.style.display = 'block';
+  }
+
+  async function fetchClients(q){
+    try {
+      const r = await fetch('/api/clients?q='+encodeURIComponent(q));
+      if(r.ok) renderDropdown(await r.json(), q);
+    } catch(_){}
+  }
+
+  function selectClient(id, nom, tel){
+    hiddenId.value = id;
+    clientOkNom.textContent = nom.trim();
+    clientOkTel.textContent = tel ? ('📞 '+tel) : '';
+    clientOk.classList.remove('d-none');
+    zoneRecherche.style.display = 'none';
+    dropdown.style.display = 'none';
+    searchInput.value = '';
+    searchInput.classList.remove('is-invalid');
+  }
+
+  function resetClientSearch(){
+    hiddenId.value = '';
+    clientOk.classList.add('d-none');
+    zoneRecherche.style.display = '';
+    searchInput.value = '';
+    searchInput.focus();
+  }
+
+  searchInput.addEventListener('focus', ()=> fetchClients(searchInput.value.trim()));
+  searchInput.addEventListener('input', ()=>{
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(()=> fetchClients(searchInput.value.trim()), 260);
+  });
+  searchInput.addEventListener('blur', ()=>{ setTimeout(()=>{ dropdown.style.display='none'; }, 200); });
+  btnChanger.addEventListener('click', resetClientSearch);
+
+  document.getElementById('formVente').addEventListener('submit', function(e){
+    if(!hiddenId.value){
+      e.preventDefault();
+      searchInput.classList.add('is-invalid');
+      zoneRecherche.style.display=''; clientOk.classList.add('d-none');
+      searchInput.focus();
+    }
+  });
+
+  /* ═══════════ MODAL CLIENT ═══════════ */
+  const modalClientEl = document.getElementById('modalClient');
+  const btnSaveClient = document.getElementById('btn_save_client');
+  const clientErr     = document.getElementById('client_modal_err');
+
+  // Bouton "Nouveau" dans la card : pré-remplir avec texte de recherche
+  document.querySelector('[data-bs-target="#modalClient"]')?.addEventListener('click', ()=>{
+    document.getElementById('mc_nom').value       = searchInput.value.trim();
+    document.getElementById('mc_prenom').value    = '';
+    document.getElementById('mc_telephone').value = '';
+    document.getElementById('mc_adresse').value   = '';
+    clientErr.classList.add('d-none');
+    setTimeout(()=>{ const f=document.getElementById('mc_nom');
+      f.setSelectionRange(f.value.length,f.value.length); f.focus(); }, 400);
+  });
+
+  btnSaveClient.addEventListener('click', async ()=>{
+    const nom  = document.getElementById('mc_nom').value.trim();
+    const pren = document.getElementById('mc_prenom').value.trim();
+    const tel  = document.getElementById('mc_telephone').value.trim();
+    const adr  = document.getElementById('mc_adresse').value.trim();
+    if(!nom){ clientErr.textContent='Le nom est obligatoire.';
+      clientErr.classList.remove('d-none'); document.getElementById('mc_nom').focus(); return; }
+    btnSaveClient.disabled = true;
+    btnSaveClient.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>…';
+    try {
+      const fd = new FormData();
+      fd.append('nom',nom); fd.append('prenom',pren);
+      fd.append('telephone',tel); fd.append('adresse',adr);
+      const resp = await fetch('/api/clients/creer', {method:'POST', body:fd});
+      const data = await resp.json();
+      if(resp.status===409){
+        selectClient(data.id, data.nom+' '+data.prenom, data.telephone);
+        bootstrap.Modal.getInstance(modalClientEl).hide(); return;
+      }
+      if(!resp.ok) throw new Error(data.error||'Erreur serveur');
+      selectClient(data.id, data.nom+' '+data.prenom, data.telephone);
+      bootstrap.Modal.getInstance(modalClientEl).hide();
+    } catch(err){ clientErr.textContent=err.message; clientErr.classList.remove('d-none'); }
+    finally {
+      btnSaveClient.disabled=false;
+      btnSaveClient.innerHTML='<i class="bi bi-check-circle me-1"></i>Créer & Sélectionner';
+    }
+  });
+  modalClientEl.addEventListener('keydown', e=>{ if(e.key==='Enter') btnSaveClient.click(); });
+
+  /* ═══════════ LIGNES ARTICLES ═══════════ */
+  let rowIdx = 0;
+
+  function buildOptions(){
+    let opts = '<option value="">— Catalogue —</option>';
+    let curCat = '';
+    produits.forEach(p=>{
+      if(p.cat!==curCat){
+        if(curCat) opts+='</optgroup>';
+        curCat=p.cat;
+        opts+=`<optgroup label="${escHtml(p.cat||'Divers')}">`;
+      }
+      opts+=`<option value="${p.id}" data-prix="${p.prix}">${escHtml(p.nom)} — ${fmtNum(p.prix)} ${DEVISE}</option>`;
+    });
+    if(curCat) opts+='</optgroup>';
+    return opts;
+  }
+
+  function refreshAllSelects(){
+    document.querySelectorAll('.sel-cat,.sel-cat-m').forEach(sel=>{
+      const v=sel.value; sel.innerHTML=buildOptions(); if(v) sel.value=v;
+    });
+  }
+
+  function addRow(nom='', pid='', prix='', qty=1, focus_=false){
+    const idx = rowIdx++;
+
+    /* — ligne desktop — */
+    const tr = document.createElement('tr');
+    tr.dataset.idx = idx;
+    tr.innerHTML = `
+      <td>
+        <select class="form-select form-select-sm sel-cat mb-1">${buildOptions()}</select>
+        <input type="text" name="produit_nom[]"
+               class="form-control form-control-sm inp-nom"
+               placeholder="Nom libre…" value="${escHtml(nom)}" required>
+        <input type="hidden" name="produit_id[]" class="inp-pid" value="${escHtml(pid)}">
+      </td>
+      <td>
+        <input type="number" name="quantite[]"
+               class="form-control form-control-sm inp-qty"
+               value="${qty}" min="1" step="1" inputmode="numeric">
+      </td>
+      <td>
+        <input type="number" name="prix_unitaire[]"
+               class="form-control form-control-sm inp-prix"
+               value="${escHtml(prix)}" min="0" step="1"
+               placeholder="0" inputmode="numeric">
+      </td>
+      <td class="text-end fw-bold td-sous align-middle">0</td>
+      <td class="align-middle">
+        <button type="button" class="btn btn-sm btn-outline-danger btn-del">
+          <i class="bi bi-trash3"></i>
+        </button>
+      </td>`;
+    document.getElementById('rows_body').appendChild(tr);
+
+    /* — carte mobile — */
+    const mc = document.createElement('div');
+    mc.dataset.mIdx = idx;
+    mc.className = 'border rounded-3 p-3 mb-2 bg-white';
+    mc.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <strong class="text-primary small">Article ${idx+1}</strong>
+        <button type="button" class="btn btn-sm btn-outline-danger btn-del-m py-0 px-2">
+          <i class="bi bi-trash3"></i>
+        </button>
+      </div>
+      <div class="mb-2">
+        <label class="form-label small fw-semibold mb-1">Catalogue</label>
+        <select class="form-select form-select-sm sel-cat-m">${buildOptions()}</select>
+      </div>
+      <div class="mb-2">
+        <label class="form-label small fw-semibold mb-1">Nom de l'article</label>
+        <input type="text" class="form-control form-control-sm inp-nom-m"
+               placeholder="Nom libre…" value="${escHtml(nom)}">
+      </div>
+      <div class="row g-2">
+        <div class="col-5">
+          <label class="form-label small fw-semibold mb-1">Quantité</label>
+          <input type="number" class="form-control form-control-sm inp-qty-m"
+                 value="${qty}" min="1" step="1" inputmode="numeric">
+        </div>
+        <div class="col-7">
+          <label class="form-label small fw-semibold mb-1">Prix ({{ params.devise }})</label>
+          <input type="number" class="form-control form-control-sm inp-prix-m"
+                 value="${escHtml(prix)}" min="0" step="1" placeholder="0" inputmode="numeric">
+        </div>
+      </div>
+      <div class="text-end mt-2 fw-bold text-primary td-sous-m" style="font-size:.82rem;">
+        Sous-total : 0 {{ params.devise }}
+      </div>`;
+    document.getElementById('rows_mobile').appendChild(mc);
+
+    /* — refs — */
+    const selCat=tr.querySelector('.sel-cat'), inpNom=tr.querySelector('.inp-nom'),
+          inpQty=tr.querySelector('.inp-qty'), inpPrix=tr.querySelector('.inp-prix'),
+          inpPid=tr.querySelector('.inp-pid');
+    const selCatM=mc.querySelector('.sel-cat-m'), inpNomM=mc.querySelector('.inp-nom-m'),
+          inpQtyM=mc.querySelector('.inp-qty-m'), inpPrixM=mc.querySelector('.inp-prix-m');
+
+    /* desktop select → sync + recalc */
+    selCat.addEventListener('change', ()=>{
+      const opt=selCat.selectedOptions[0];
+      if(opt&&opt.value){
+        inpNom.value=opt.textContent.split(' — ')[0].trim();
+        inpPid.value=opt.value; inpPrix.value=opt.dataset.prix||0;
+        selCatM.value=opt.value; inpNomM.value=inpNom.value; inpPrixM.value=inpPrix.value;
+        setTimeout(()=>inpQty.focus(),40);
+      } else inpPid.value='';
+      recalc();
+    });
+    /* mobile select → sync */
+    selCatM.addEventListener('change', ()=>{
+      const opt=selCatM.selectedOptions[0];
+      if(opt&&opt.value){
+        inpNomM.value=opt.textContent.split(' — ')[0].trim();
+        inpPrixM.value=opt.dataset.prix||0;
+        inpNom.value=inpNomM.value; inpPrix.value=inpPrixM.value;
+        inpPid.value=opt.value; selCat.value=opt.value;
+      } else inpPid.value='';
+      recalc();
+    });
+    [inpQty,inpPrix].forEach(el=>el.addEventListener('input',()=>{
+      inpQtyM.value=inpQty.value; inpPrixM.value=inpPrix.value; recalc();
+    }));
+    [inpQtyM,inpPrixM].forEach(el=>el.addEventListener('input',()=>{
+      inpQty.value=inpQtyM.value; inpPrix.value=inpPrixM.value; recalc();
+    }));
+    inpNom.addEventListener('input',()=>{ inpNomM.value=inpNom.value; });
+    inpNomM.addEventListener('input',()=>{ inpNom.value=inpNomM.value; });
+
+    const delFn=()=>{ tr.remove(); mc.remove(); recalc(); };
+    tr.querySelector('.btn-del').addEventListener('click',delFn);
+    mc.querySelector('.btn-del-m').addEventListener('click',delFn);
+
+    if(pid){ selCat.value=pid; selCatM.value=pid; inpPid.value=pid; }
+    if(focus_) setTimeout(()=>selCat.focus(),60);
+    recalc();
+  }
+
+  function recalc(){
+    let total=0;
+    document.querySelectorAll('#rows_body tr').forEach(tr=>{
+      const qty=parseFloat(tr.querySelector('.inp-qty')?.value)||0;
+      const prix=parseFloat(tr.querySelector('.inp-prix')?.value)||0;
+      const sous=qty*prix; total+=sous;
+      const tdS=tr.querySelector('.td-sous'); if(tdS) tdS.textContent=fmtNum(sous)+' '+DEVISE;
+      /* sync mobile sous-total */
+      const mc=document.querySelector(`[data-m-idx="${tr.dataset.idx}"]`);
+      const mS=mc?.querySelector('.td-sous-m');
+      if(mS) mS.textContent='Sous-total : '+fmtNum(sous)+' '+DEVISE;
+    });
+    const initial=Math.min(parseFloat(document.getElementById('inp_initial').value)||0, total);
+    const reste=Math.max(0,total-initial);
+    document.getElementById('lbl_total').textContent=fmtNum(total);
+    document.getElementById('lbl_initial').textContent=fmtNum(initial)+' '+DEVISE;
+    const lr=document.getElementById('lbl_reste');
+    lr.textContent=fmtNum(reste)+' '+DEVISE;
+    lr.className='fw-bold '+(reste>0?'text-danger':'text-success');
+  }
+
+  document.getElementById('btn_add_row').addEventListener('click',()=>addRow('','','',1,true));
+  document.getElementById('inp_initial').addEventListener('input',recalc);
+
+  /* ═══════════ MODAL PRODUIT ═══════════ */
+  const modalProduitEl = document.getElementById('modalProduit');
+  const btnSaveProduit = document.getElementById('btn_save_produit');
+  const produitErr     = document.getElementById('produit_modal_err');
+
+  document.getElementById('btn_new_produit').addEventListener('click',()=>{
+    ['mp_nom','mp_cat','mp_prix','mp_desc'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('mp_add_row').checked=true;
+    produitErr.classList.add('d-none');
+    setTimeout(()=>document.getElementById('mp_nom').focus(), 400);
+  });
+
+  btnSaveProduit.addEventListener('click', async ()=>{
+    const nom  = document.getElementById('mp_nom').value.trim();
+    const cat  = document.getElementById('mp_cat').value.trim();
+    const prix = document.getElementById('mp_prix').value.trim();
+    const desc = document.getElementById('mp_desc').value.trim();
+    const doAdd= document.getElementById('mp_add_row').checked;
+    if(!nom){ produitErr.textContent="Le nom de l'article est obligatoire.";
+      produitErr.classList.remove('d-none'); document.getElementById('mp_nom').focus(); return; }
+    btnSaveProduit.disabled=true;
+    btnSaveProduit.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>…';
+    try {
+      const fd=new FormData();
+      fd.append('nom',nom); fd.append('categorie',cat);
+      fd.append('prix_unitaire',prix||'0'); fd.append('description',desc);
+      const resp = await fetch('/api/produits/creer',{method:'POST',body:fd});
+      const data = await resp.json();
+      if(!resp.ok) throw new Error(data.error||'Erreur serveur');
+      produits.push({id:data.id, nom:data.nom, prix:data.prix_unitaire, cat:data.categorie||''});
+      refreshAllSelects();
+      bootstrap.Modal.getInstance(modalProduitEl).hide();
+      if(doAdd) addRow(data.nom, String(data.id), String(data.prix_unitaire), 1, false);
+    } catch(err){ produitErr.textContent=err.message; produitErr.classList.remove('d-none'); }
+    finally {
+      btnSaveProduit.disabled=false;
+      btnSaveProduit.innerHTML='<i class="bi bi-check-circle me-1"></i>Créer & Ajouter';
+    }
+  });
+  modalProduitEl.addEventListener('keydown', e=>{ if(e.key==='Enter') btnSaveProduit.click(); });
+
+  /* ═══════════ INIT ═══════════ */
+  addRow();
+
+  {% if request.args.get('client_id') %}
+  (async function(){
+    try {
+      const r=await fetch('/api/clients?q=');
+      const all=await r.json();
+      const pre=all.find(c=>String(c.id)==='{{ request.args.get("client_id")|int }}');
+      if(pre) selectClient(pre.id, pre.nom+' '+pre.prenom, pre.telephone||'');
+    } catch(_){}
+  })();
+  {% endif %}
+})();
+</script>
+{% endblock %}

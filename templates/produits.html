@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% block title %}Produits{% endblock %}
+{% block page_title %}Catalogue Produits{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header d-flex flex-wrap gap-2 justify-content-between align-items-center">
+    <span><i class="bi bi-box-seam-fill me-2 text-primary"></i>Produits du catalogue</span>
+    <div class="d-flex gap-2">
+      <form class="search-box" method="get">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text border-end-0"><i class="bi bi-search text-muted"></i></span>
+          <input type="text" name="q" value="{{ search }}" placeholder="Rechercher…"
+                 class="form-control border-start-0" style="width:180px;">
+          <button class="btn btn-outline-secondary" type="submit">OK</button>
+          {% if search %}<a href="{{ url_for('produits') }}" class="btn btn-outline-danger">✕</a>{% endif %}
+        </div>
+      </form>
+      <a href="{{ url_for('ajouter_produit') }}" class="btn btn-sm btn-primary">
+        <i class="bi bi-plus-circle me-1"></i>Nouveau produit
+      </a>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    {% if produits %}
+    <div class="table-responsive">
+      <table class="table table-hover table-mobile mb-0">
+        <thead>
+          <tr>
+            <th class="ps-3">Produit</th>
+            <th>Catégorie</th>
+            <th>Description</th>
+            <th class="text-end">Prix unitaire</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in produits %}
+          <tr>
+            <td class="ps-3 fw-semibold">{{ p.nom }}</td>
+            <td>
+              {% if p.categorie %}
+              <span class="badge bg-light text-dark border">{{ p.categorie }}</span>
+              {% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td class="text-muted small">{{ p.description or '—' }}</td>
+            <td class="text-end fw-bold text-success">
+              {{ p.prix_unitaire|fmt_money }} <small class="text-muted">{{ params.devise }}</small>
+            </td>
+            <td class="text-end pe-3">
+              <a href="{{ url_for('modifier_produit', pid=p.id) }}"
+                 class="btn btn-sm btn-outline-secondary me-1">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="post" action="{{ url_for('supprimer_produit', pid=p.id) }}"
+                    class="d-inline"
+                    onsubmit="return confirm('Archiver ce produit ?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button class="btn btn-sm btn-outline-danger">
+                  <i class="bi bi-archive"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <i class="bi bi-box-seam"></i>
+      {% if search %}Aucun produit pour « {{ search }} »{% else %}Aucun produit dans le catalogue{% endif %}<br>
+      <a href="{{ url_for('ajouter_produit') }}" class="btn btn-primary mt-3">
+        <i class="bi bi-plus-circle me-1"></i>Ajouter un produit
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

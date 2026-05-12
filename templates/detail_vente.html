@@ -1,0 +1,208 @@
+{% extends 'base.html' %}
+{% block title %}Crédit {{ vente.numero }}{% endblock %}
+{% block page_title %}Détail Crédit — {{ vente.numero }}{% endblock %}
+
+{% block content %}
+
+<!-- Header statut -->
+<div class="alert {% if vente.statut=='en_cours' %}alert-warning{% else %}alert-success{% endif %} rounded-3 d-flex justify-content-between align-items-center py-2 px-3 mb-3">
+  <div>
+    <strong>Crédit N° {{ vente.numero }}</strong> ·
+    {{ vente.date_vente|fmt_date }} ·
+    <a href="{{ url_for('detail_client', cid=vente.client_id) }}" class="fw-bold text-decoration-none">
+      {{ vente.client_nom }} {{ vente.client_prenom }}
+    </a>
+  </div>
+  <div class="d-flex gap-2 align-items-center">
+    <span class="badge badge-{{ vente.statut }} rounded-pill px-3 py-2 fs-6">
+      {% if vente.statut=='en_cours' %}Non payé{% else %}Soldé{% endif %}
+    </span>
+    <a href="{{ url_for('recu', vid=vente.id) }}" class="btn btn-sm btn-outline-secondary" target="_blank">
+      <i class="bi bi-printer me-1"></i>Reçu
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Info client & vente -->
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-person-fill me-2 text-primary"></i>Client</div>
+      <div class="card-body">
+        <a href="{{ url_for('detail_client', cid=vente.client_id) }}"
+           class="fw-bold fs-5 text-decoration-none">
+          {{ vente.client_nom }} {{ vente.client_prenom }}
+        </a>
+        <div class="mt-2 d-flex flex-column gap-1 text-muted small">
+          <div><i class="bi bi-telephone-fill me-1 text-success"></i>{{ vente.client_telephone or '—' }}</div>
+          <div><i class="bi bi-geo-alt-fill me-1 text-danger"></i>{{ vente.client_adresse or '—' }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Résumé financier -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-calculator me-2 text-primary"></i>Résumé financier</div>
+      <div class="card-body">
+        <table class="table table-sm table-borderless mb-0">
+          <tr>
+            <td class="text-muted">Montant total</td>
+            <td class="text-end fw-bold">{{ vente.montant_total|fmt_money }} {{ params.devise }}</td>
+          </tr>
+          <tr>
+            <td class="text-muted">Total payé</td>
+            <td class="text-end fw-bold text-success">{{ vente.montant_paye|fmt_money }} {{ params.devise }}</td>
+          </tr>
+          <tr class="border-top">
+            <td class="fw-bold {% if vente.statut=='en_cours' %}text-danger{% else %}text-success{% endif %}">
+              Reste à payer
+            </td>
+            <td class="text-end fw-bold fs-5 {% if vente.statut=='en_cours' %}text-danger{% else %}text-success{% endif %}">
+              {% if vente.statut=='en_cours' %}{{ reste|fmt_money }} {{ params.devise }}
+              {% else %}<i class="bi bi-check-circle-fill"></i> SOLDÉ{% endif %}
+            </td>
+          </tr>
+        </table>
+        {% if vente.notes %}
+        <hr class="my-2">
+        <small class="text-muted"><i class="bi bi-sticky-fill me-1"></i>{{ vente.notes }}</small>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Formulaire paiement -->
+    {% if vente.statut == 'en_cours' %}
+    <div class="card border-success">
+      <div class="card-header bg-success text-white">
+        <i class="bi bi-cash-coin me-2"></i>Enregistrer un paiement
+      </div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('ajouter_paiement', vid=vente.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <div class="mb-2">
+            <label class="form-label fw-semibold small">Montant ({{ params.devise }}) <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <input type="number" name="montant" class="form-control"
+                     placeholder="0" min="1" max="{{ reste }}" step="1"
+                     inputmode="numeric" required>
+              <span class="input-group-text">{{ params.devise }}</span>
+            </div>
+            <div class="form-text">
+              Max : <strong>{{ reste|fmt_money }} {{ params.devise }}</strong>
+              <button type="button" class="btn btn-link btn-sm p-0 ms-1 text-success"
+                      onclick="this.closest('form').querySelector('[name=montant]').value='{{ reste|int }}'">
+                Tout régler
+              </button>
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label fw-semibold small">Date du paiement</label>
+            <input type="date" name="date_paiement" class="form-control form-control-sm"
+                   value="{{ today }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Notes</label>
+            <input type="text" name="notes" class="form-control form-control-sm"
+                   placeholder="Espèces, mobile money…">
+          </div>
+          <button type="submit" class="btn btn-success w-100">
+            <i class="bi bi-check-circle me-1"></i>Valider le paiement
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Produits + Paiements -->
+  <div class="col-lg-8">
+    <!-- Produits -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-cart3 me-2 text-primary"></i>Produits achetés</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-mobile mb-0">
+            <thead>
+              <tr>
+                <th class="ps-3">Produit</th>
+                <th class="text-center">Qté</th>
+                <th class="text-end">Prix unit.</th>
+                <th class="text-end pe-3">Sous-total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+              <tr>
+                <td class="ps-3 fw-semibold">{{ item.produit_nom }}</td>
+                <td class="text-center">{{ item.quantite }}</td>
+                <td class="text-end">{{ item.prix_unitaire|fmt_money }} {{ params.devise }}</td>
+                <td class="text-end pe-3 fw-bold">
+                  {{ (item.quantite * item.prix_unitaire)|fmt_money }} {{ params.devise }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="table-light">
+              <tr>
+                <td colspan="3" class="ps-3 fw-bold text-end">TOTAL</td>
+                <td class="text-end pe-3 fw-bold fs-5">
+                  {{ vente.montant_total|fmt_money }} {{ params.devise }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Historique paiements -->
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-clock-history me-2 text-success"></i>Historique des paiements
+      </div>
+      <div class="card-body p-0">
+        {% if paiements %}
+        <div class="table-responsive">
+          <table class="table table-hover table-mobile mb-0">
+            <thead>
+              <tr>
+                <th class="ps-3">#</th>
+                <th>Date</th>
+                <th>Notes</th>
+                <th class="text-end pe-3">Montant</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in paiements %}
+              <tr>
+                <td class="ps-3 text-muted small">{{ loop.index }}</td>
+                <td>{{ p.date_paiement|fmt_date }}</td>
+                <td class="text-muted small">{{ p.notes or '—' }}</td>
+                <td class="text-end pe-3 fw-bold text-success">
+                  +{{ p.montant|fmt_money }} {{ params.devise }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="table-light">
+              <tr>
+                <td colspan="3" class="ps-3 fw-semibold text-end">Total payé</td>
+                <td class="text-end pe-3 fw-bold text-success">
+                  {{ vente.montant_paye|fmt_money }} {{ params.devise }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding:30px;">
+          <i class="bi bi-cash-coin" style="font-size:2rem;"></i><br>
+          Aucun paiement enregistré.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

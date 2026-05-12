@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}{% if produit %}Modifier Produit{% else %}Nouveau Produit{% endif %}{% endblock %}
+{% block page_title %}{% if produit %}Modifier Produit{% else %}Nouveau Produit{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-box-seam-fill me-2 text-primary"></i>
+        {% if produit %}Modifier : {{ produit.nom }}{% else %}Ajouter un nouveau produit{% endif %}
+      </div>
+      <div class="card-body p-4">
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Nom du produit <span class="text-danger">*</span></label>
+              <input type="text" name="nom" class="form-control"
+                     value="{{ produit.nom if produit else '' }}"
+                     placeholder="Ex: iPhone 14 Pro, Écouteurs Samsung…" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Catégorie</label>
+              <input type="text" name="categorie" class="form-control" list="cats"
+                     value="{{ produit.categorie if produit else '' }}"
+                     placeholder="Ex: Téléphone, Accessoire…">
+              <datalist id="cats">
+                <option value="Téléphone">
+                <option value="Tablette">
+                <option value="Accessoire">
+                <option value="Écouteurs / Casque">
+                <option value="Chargeur / Câble">
+                <option value="Coque / Protection">
+                <option value="Montre connectée">
+                <option value="Autre">
+              </datalist>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Prix unitaire ({{ params.devise }})</label>
+              <div class="input-group">
+                <input type="number" name="prix_unitaire" class="form-control"
+                       value="{{ produit.prix_unitaire if produit else '' }}"
+                       placeholder="0" min="0" step="1" inputmode="numeric">
+                <span class="input-group-text">{{ params.devise }}</span>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Description</label>
+              <textarea name="description" class="form-control" rows="2"
+                        placeholder="Couleur, capacité, caractéristiques…">{{ produit.description if produit else '' }}</textarea>
+            </div>
+          </div>
+          <hr class="my-4"/>
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="{{ url_for('produits') }}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left me-1"></i>Annuler
+            </a>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle me-1"></i>
+              {% if produit %}Enregistrer les modifications{% else %}Ajouter le produit{% endif %}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

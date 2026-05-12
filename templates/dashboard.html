@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+{% block title %}Tableau de Bord{% endblock %}
+{% block page_title %}Tableau de Bord{% endblock %}
+
+{% block content %}
+<!-- Stat cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="stat c1">
+      <p>Crédits non payés</p>
+      <h2>{{ stats.credits_en_cours }}</h2>
+      <i class="bi bi-hourglass-split bg-icon"></i>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat c2">
+      <p>Montant total dû</p>
+      <h2 style="font-size:1.3rem;">{{ stats.montant_total_du|fmt_money }}</h2>
+      <p style="margin-top:2px;">{{ params.devise }}</p>
+      <i class="bi bi-cash-stack bg-icon"></i>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat c3">
+      <p>Soldés ce mois</p>
+      <h2>{{ stats.credits_soldes_mois }}</h2>
+      <i class="bi bi-check-circle bg-icon"></i>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat c4">
+      <p>Total clients</p>
+      <h2>{{ stats.total_clients }}</h2>
+      <i class="bi bi-people bg-icon"></i>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Recent credits -->
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-clock-history me-2 text-primary"></i>Crédits récents</span>
+        <a href="{{ url_for('ventes') }}" class="btn btn-sm btn-outline-primary">Voir tout</a>
+      </div>
+      <div class="card-body p-0">
+        {% if recent %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th class="ps-3">N°</th>
+                <th>Client</th>
+                <th>Total</th>
+                <th>Reste</th>
+                <th>Statut</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for v in recent %}
+              <tr>
+                <td class="ps-3 fw-semibold text-muted small">{{ v.numero }}</td>
+                <td>
+                  <div class="fw-semibold" style="font-size:.875rem;">{{ v.client_nom }}</div>
+                  <small class="text-muted">{{ v.telephone }}</small>
+                </td>
+                <td class="fw-semibold">{{ v.montant_total|fmt_money }} <small class="text-muted">{{ params.devise }}</small></td>
+                <td class="{% if v.statut == 'en_cours' %}text-danger fw-bold{% else %}text-success{% endif %}">
+                  {% if v.statut == 'en_cours' %}
+                    {{ (v.montant_total - v.montant_paye)|fmt_money }}
+                  {% else %}0{% endif %}
+                </td>
+                <td>
+                  <span class="badge badge-{{ v.statut }} rounded-pill px-2 py-1">
+                    {% if v.statut == 'en_cours' %}Non payé{% else %}Soldé{% endif %}
+                  </span>
+                </td>
+                <td>
+                  <a href="{{ url_for('detail_vente', vid=v.id) }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+          <i class="bi bi-credit-card"></i>
+          Aucun crédit enregistré.<br>
+          <a href="{{ url_for('nouvelle_vente') }}" class="btn btn-primary mt-3">
+            <i class="bi bi-plus-circle me-1"></i>Créer le premier
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Top debtors -->
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-person-exclamation me-2 text-danger"></i>Clients avec solde ouvert
+      </div>
+      <div class="card-body p-0">
+        {% if top_debiteurs %}
+        <ul class="list-group list-group-flush">
+          {% for d in top_debiteurs %}
+          <li class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+            <div>
+              <a href="{{ url_for('detail_client', cid=d.id) }}"
+                 class="fw-semibold text-decoration-none" style="font-size:.875rem;">
+                {{ d.client_nom }}
+              </a><br>
+              <small class="text-muted">
+                <i class="bi bi-telephone-fill me-1"></i>{{ d.telephone }} ·
+                {{ d.nb_credits }} crédit(s)
+              </small>
+            </div>
+            <span class="badge bg-danger rounded-pill">
+              {{ d.total_du|fmt_money }} {{ params.devise }}
+            </span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="empty-state">
+          <i class="bi bi-emoji-smile" style="color:#66bb6a;"></i>
+          Aucun crédit en attente !
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% block title %}{{ client.nom }} {{ client.prenom }}{% endblock %}
+{% block page_title %}Fiche Client — {{ client.nom }} {{ client.prenom }}{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  <!-- Info client -->
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-person-circle me-2 text-primary"></i>Informations</span>
+        <a href="{{ url_for('modifier_client', cid=client.id) }}"
+           class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-pencil me-1"></i>Modifier
+        </a>
+      </div>
+      <div class="card-body">
+        <h4 class="fw-bold mb-1">{{ client.nom }} {{ client.prenom }}</h4>
+        <p class="text-muted mb-3 small">Client depuis {{ client.date_inscription|fmt_date }}</p>
+        <div class="d-flex flex-column gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-telephone-fill text-success" style="width:18px;"></i>
+            <span>{{ client.telephone or 'Non renseigné' }}</span>
+          </div>
+          <div class="d-flex align-items-start gap-2">
+            <i class="bi bi-geo-alt-fill text-danger mt-1" style="width:18px;"></i>
+            <span>{{ client.adresse or 'Non renseignée' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="col-lg-8">
+    <div class="row g-3 h-100">
+      <div class="col-6">
+        <div class="stat c1 h-100">
+          <p>Total crédits</p><h2>{{ stats.total }}</h2>
+          <i class="bi bi-journal-text bg-icon"></i>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="stat c2 h-100">
+          <p>Non payés</p><h2>{{ stats.en_cours }}</h2>
+          <i class="bi bi-hourglass-split bg-icon"></i>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="stat c3 h-100">
+          <p>Soldés</p><h2>{{ stats.soldes }}</h2>
+          <i class="bi bi-check-circle bg-icon"></i>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="stat {% if stats.total_du > 0 %}c2{% else %}c3{% endif %} h-100">
+          <p>Montant dû</p>
+          <h2 style="font-size:1.3rem;">{{ stats.total_du|fmt_money }}</h2>
+          <p>{{ params.devise }}</p>
+          <i class="bi bi-cash-stack bg-icon"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Liste des crédits -->
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-credit-card-2-front-fill me-2 text-primary"></i>Historique des Crédits</span>
+    <a href="{{ url_for('nouvelle_vente') }}?client_id={{ client.id }}"
+       class="btn btn-sm btn-primary">
+      <i class="bi bi-plus-circle me-1"></i>Nouveau crédit
+    </a>
+  </div>
+  <div class="card-body p-0">
+    {% if ventes %}
+    <div class="table-responsive">
+      <table class="table table-hover table-mobile mb-0">
+        <thead>
+          <tr>
+            <th class="ps-3">N° Crédit</th>
+            <th>Date vente</th>
+            <th>Produits</th>
+            <th>Total</th>
+            <th>Payé</th>
+            <th>Reste</th>
+            <th>Statut</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in ventes %}
+          <tr>
+            <td class="ps-3 fw-semibold text-muted small">{{ v.numero }}</td>
+            <td>{{ v.date_vente|fmt_date }}</td>
+            <td class="text-muted small">—</td>
+            <td class="fw-semibold">{{ v.montant_total|fmt_money }} <small class="text-muted">{{ params.devise }}</small></td>
+            <td class="text-success">{{ v.montant_paye|fmt_money }}</td>
+            <td class="{% if v.statut=='en_cours' %}text-danger fw-bold{% else %}text-success{% endif %}">
+              {% if v.statut=='en_cours' %}{{ (v.montant_total-v.montant_paye)|fmt_money }}{% else %}0{% endif %}
+            </td>
+            <td>
+              <span class="badge badge-{{ v.statut }} rounded-pill px-2">
+                {% if v.statut=='en_cours' %}Non payé{% else %}Soldé{% endif %}
+              </span>
+            </td>
+            <td class="pe-3">
+              <a href="{{ url_for('detail_vente', vid=v.id) }}"
+                 class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-eye"></i></a>
+              <a href="{{ url_for('recu', vid=v.id) }}"
+                 class="btn btn-sm btn-outline-secondary" title="Reçu"><i class="bi bi-receipt"></i></a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <i class="bi bi-credit-card"></i>
+      Aucun crédit pour ce client.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
