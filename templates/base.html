@@ -11,7 +11,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <meta name="apple-mobile-web-app-title" content="ART Crédit"/>
-  <link rel="apple-touch-icon" href="/static/logo.png"/>
+  <link rel="apple-touch-icon" sizes="152x152" href="/static/icons/icon-152.png"/>
+  <link rel="apple-touch-icon" sizes="192x192" href="/static/icons/icon-192.png"/>
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png"/>
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png"/>
+  <link rel="icon" type="image/png" sizes="512x512" href="/static/icons/icon-512.png"/>
   <link rel="icon" type="image/png" href="/static/logo.png"/>
   <!-- Préconnexion CDN pour accélérer le chargement -->
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin/>
@@ -406,6 +410,29 @@
         <span class="d-none d-sm-inline">Nouveau Crédit</span>
         <i class="bi bi-plus-lg d-sm-none"></i>
       </a>
+
+      <!-- Utilisateur connecté -->
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center gap-1"
+                type="button" data-bs-toggle="dropdown" aria-expanded="false"
+                style="border-radius:8px;font-size:.8rem;">
+          <i class="bi bi-person-circle" style="font-size:1rem;"></i>
+          <span class="d-none d-sm-inline">{{ current_username }}</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="font-size:.85rem;min-width:170px;">
+          <li>
+            <a class="dropdown-item" href="{{ url_for('parametres') }}">
+              <i class="bi bi-gear me-2 text-secondary"></i>Paramètres
+            </a>
+          </li>
+          <li><hr class="dropdown-divider my-1"></li>
+          <li>
+            <a class="dropdown-item text-danger" href="{{ url_for('logout') }}">
+              <i class="bi bi-box-arrow-right me-2"></i>Déconnexion
+            </a>
+          </li>
+        </ul>
+      </div>
     </div>
   </div>
 

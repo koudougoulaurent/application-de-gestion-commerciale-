@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, abort
 from flask_compress import Compress
+from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import re
 import secrets
@@ -46,6 +47,21 @@ def csrf_protect():
             abort(403)
 
 
+# Endpoints publics (pas de login requis)
+_PUBLIC_ENDPOINTS = frozenset({
+    'login', 'logout', 'pwa_manifest', 'service_worker', 'offline_page', 'ping', 'static'
+})
+
+
+@app.before_request
+def require_login():
+    ep = request.endpoint
+    if ep is None or ep in _PUBLIC_ENDPOINTS:
+        return
+    if 'user_id' not in session:
+        return redirect(url_for('login', next=request.path))
+
+
 @app.after_request
 def set_security_headers(resp):
     resp.headers['X-Frame-Options'] = 'SAMEORIGIN'
@@ -62,7 +78,8 @@ def set_security_headers(resp):
 def inject_globals():
     alertes = []
     # Éviter une requête DB inutile sur les appels AJAX/API/static
-    skip = request.path.startswith(('/api/', '/static/', '/ping', '/sw.js', '/manifest.json', '/offline'))
+    skip = (request.path.startswith(('/api/', '/static/', '/ping', '/sw.js', '/manifest.json', '/offline', '/login', '/logout'))
+           or 'user_id' not in session)
     if not skip:
         try:
             conn = get_db()
@@ -107,6 +124,7 @@ def inject_globals():
         'csrf_token': session.get('csrf_token', ''),
         'alertes': alertes,
         'nb_alertes': len(alertes),
+        'current_username': session.get('username', ''),
     }
 
 
@@ -281,6 +299,11 @@ def init_db():
             "CREATE INDEX IF NOT EXISTS idx_items_vente ON vente_items(vente_id)",
             "CREATE INDEX IF NOT EXISTS idx_paiements_vente ON paiements(vente_id)",
             "CREATE INDEX IF NOT EXISTS idx_clients_nom ON clients(nom)",
+            """CREATE TABLE IF NOT EXISTS users (
+                id       SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL
+            )""",
         ]
         for stmt in ddl:
             cur.execute(stmt)
@@ -351,9 +374,28 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_items_vente ON vente_items(vente_id);
             CREATE INDEX IF NOT EXISTS idx_paiements_vente ON paiements(vente_id);
             CREATE INDEX IF NOT EXISTS idx_clients_nom ON clients(nom);
+            CREATE TABLE IF NOT EXISTS users (
+                id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL
+            );
         ''')
         conn.commit()
         conn.close()
+
+
+def seed_admin():
+    """Crée l'utilisateur admin par défaut si aucun utilisateur n'existe."""
+    try:
+        conn = get_db()
+        n = conn.execute('SELECT COUNT(*) AS n FROM users').fetchone()['n']
+        if n == 0:
+            pw = generate_password_hash('admin')
+            conn.execute('INSERT INTO users (username, password) VALUES (?,?)', ('admin', pw))
+            conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f'[seed_admin] Erreur: {e}')
 
 
 def get_params():
@@ -388,6 +430,41 @@ def fmt_money(amount):
     if amount is None:
         return '0'
     return f"{float(amount):,.0f}".replace(',', ' ')
+
+
+# ───────────────────────────────── AUTHENTIFICATION ─────────────────────────────────
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
+    error = None
+    if request.method == 'POST':
+        username = clean(request.form.get('username', ''), 100)
+        password = request.form.get('password', '')
+        conn = get_db()
+        user = conn.execute('SELECT * FROM users WHERE username=?', (username,)).fetchone()
+        conn.close()
+        if user and check_password_hash(user['password'], password):
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+            next_url = request.form.get('next') or request.args.get('next') or url_for('dashboard')
+            # Sécurité : ne rediriger que vers des chemins relatifs
+            if next_url.startswith('/') and not next_url.startswith('//'):
+                return redirect(next_url)
+            return redirect(url_for('dashboard'))
+        error = 'Nom d\'utilisateur ou mot de passe incorrect.'
+    params = get_params()
+    next_url = request.args.get('next', '')
+    return render_template('login.html', params=params, error=error, next_url=next_url)
+
+
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    session.pop('username', None)
+    flash('Vous avez été déconnecté.', 'info')
+    return redirect(url_for('login'))
 
 
 # ───────────────────────────────── DASHBOARD ─────────────────────────────────
@@ -853,6 +930,32 @@ def parametres():
     return render_template('parametres.html', params=params)
 
 
+@app.route('/parametres/mot-de-passe', methods=['POST'])
+def changer_mot_de_passe():
+    user_id = session.get('user_id')
+    ancien = request.form.get('ancien_mdp', '')
+    nouveau = request.form.get('nouveau_mdp', '').strip()
+    confirm = request.form.get('confirm_mdp', '').strip()
+    if len(nouveau) < 4:
+        flash('Le nouveau mot de passe doit contenir au moins 4 caractères.', 'danger')
+        return redirect(url_for('parametres'))
+    if nouveau != confirm:
+        flash('Les nouveaux mots de passe ne correspondent pas.', 'danger')
+        return redirect(url_for('parametres'))
+    conn = get_db()
+    user = conn.execute('SELECT * FROM users WHERE id=?', (user_id,)).fetchone()
+    if not user or not check_password_hash(user['password'], ancien):
+        conn.close()
+        flash('Ancien mot de passe incorrect.', 'danger')
+        return redirect(url_for('parametres'))
+    conn.execute('UPDATE users SET password=? WHERE id=?',
+                 (generate_password_hash(nouveau), user_id))
+    conn.commit()
+    conn.close()
+    flash('Mot de passe modifié avec succès !', 'success')
+    return redirect(url_for('parametres'))
+
+
 # ───────────────────────────────── API JSON ─────────────────────────────────
 
 @app.route('/api/produit/<int:pid>')
@@ -967,6 +1070,11 @@ def offline_page():
 # Initialise les tables au démarrage (gunicorn ou python direct)
 if DATABASE_URL:
     init_db()
+    seed_admin()
+else:
+    # SQLite — init locale au premier lancement
+    init_db()
+    seed_admin()
 
 if __name__ == '__main__':
     print("\n" + "="*55)

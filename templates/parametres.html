@@ -64,6 +64,42 @@
         <p class="mb-0 mt-1">Base de données : SQLite locale — vos données restent sur votre ordinateur.</p>
       </div>
     </div>
+
+    <!-- Sécurité : changer le mot de passe -->
+    <div class="card mt-3">
+      <div class="card-header">
+        <i class="bi bi-shield-lock-fill me-2 text-warning"></i>Sécurité — Changer le mot de passe
+      </div>
+      <div class="card-body p-4">
+        <form method="post" action="{{ url_for('changer_mot_de_passe') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Ancien mot de passe</label>
+              <input type="password" name="ancien_mdp" class="form-control"
+                     placeholder="Mot de passe actuel" required autocomplete="current-password">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold">Nouveau mot de passe</label>
+              <input type="password" name="nouveau_mdp" class="form-control"
+                     placeholder="Minimum 4 caractères" required minlength="4"
+                     autocomplete="new-password">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold">Confirmer le nouveau</label>
+              <input type="password" name="confirm_mdp" class="form-control"
+                     placeholder="Répétez le nouveau" required minlength="4"
+                     autocomplete="new-password">
+            </div>
+          </div>
+          <hr class="my-4"/>
+          <button type="submit" class="btn btn-warning w-100 fw-semibold">
+            <i class="bi bi-key-fill me-1"></i>Mettre à jour le mot de passe
+          </button>
+        </form>
+      </div>
+    </div>
+
   </div>
 </div>
 {% endblock %}

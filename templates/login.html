@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Connexion — {% if params %}{{ params.nom_boutique }}{% else %}ART Gestion Crédit{% endif %}</title>
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png"/>
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png"/>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"/>
+  <style>
+    :root {
+      --green:       #1b5e20;
+      --green-mid:   #2e7d32;
+      --green-light: #4caf50;
+      --accent:      #a5d6a7;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(135deg, var(--green) 0%, #1a237e 100%);
+      padding: 20px;
+    }
+
+    /* Cercles décoratifs en arrière-plan */
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      opacity: .12;
+      pointer-events: none;
+    }
+    body::before {
+      width: 600px; height: 600px;
+      top: -160px; right: -160px;
+      background: radial-gradient(circle, #fff, transparent);
+    }
+    body::after {
+      width: 400px; height: 400px;
+      bottom: -100px; left: -100px;
+      background: radial-gradient(circle, var(--accent), transparent);
+    }
+
+    .login-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.35);
+      position: relative;
+      z-index: 1;
+    }
+
+    .logo-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+    .logo-ring {
+      width: 90px; height: 90px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--green), #42a5f5);
+      padding: 4px;
+      box-shadow: 0 6px 20px rgba(27,94,32,.35);
+      margin-bottom: 14px;
+    }
+    .logo-ring img {
+      width: 100%; height: 100%;
+      border-radius: 50%;
+      object-fit: contain;
+      background: #fff;
+      display: block;
+    }
+    .logo-fallback {
+      width: 82px; height: 82px;
+      border-radius: 50%;
+      background: #fff;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-fallback i { font-size: 2.4rem; color: var(--green-mid); }
+
+    .shop-name {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--green);
+      text-align: center;
+      margin-bottom: 2px;
+    }
+    .shop-sub {
+      font-size: .78rem;
+      color: #94a3b8;
+      text-align: center;
+    }
+
+    .login-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 22px;
+      text-align: center;
+    }
+    .login-title::before {
+      content: '';
+      display: block;
+      width: 40px;
+      height: 3px;
+      background: linear-gradient(90deg, var(--green), #42a5f5);
+      border-radius: 2px;
+      margin: 0 auto 10px;
+    }
+
+    .form-label {
+      font-size: .82rem;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 5px;
+    }
+    .form-control {
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: .9rem;
+      transition: border-color .18s, box-shadow .18s;
+    }
+    .form-control:focus {
+      border-color: var(--green-light);
+      box-shadow: 0 0 0 3px rgba(76,175,80,.15);
+    }
+    .input-group .form-control { border-radius: 0 10px 10px 0; }
+    .input-group .input-group-text {
+      border: 1.5px solid #e2e8f0;
+      border-right: none;
+      border-radius: 10px 0 0 10px;
+      background: #f8fafc;
+      color: #94a3b8;
+    }
+    .input-group:focus-within .input-group-text {
+      border-color: var(--green-light);
+    }
+
+    .btn-login {
+      background: linear-gradient(135deg, var(--green-mid), #1565c0);
+      border: none;
+      border-radius: 10px;
+      padding: 11px;
+      font-size: .92rem;
+      font-weight: 700;
+      color: #fff;
+      width: 100%;
+      transition: opacity .18s, transform .12s;
+      margin-top: 6px;
+    }
+    .btn-login:hover { opacity: .92; transform: translateY(-1px); color: #fff; }
+    .btn-login:active { transform: translateY(0); }
+
+    .alert-danger {
+      border-radius: 10px;
+      font-size: .85rem;
+      padding: 10px 14px;
+    }
+    .pass-toggle {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      padding: 0 12px;
+      position: absolute;
+      right: 0; top: 50%;
+      transform: translateY(-50%);
+      z-index: 5;
+      line-height: 1;
+    }
+    .pass-toggle:hover { color: var(--green-mid); }
+    .pw-wrapper { position: relative; }
+
+    .footer-note {
+      text-align: center;
+      font-size: .72rem;
+      color: #94a3b8;
+      margin-top: 22px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+
+    <!-- Logo + nom boutique -->
+    <div class="logo-wrapper">
+      <div class="logo-ring" id="logoRing">
+        <img src="/static/logo.png" alt="Logo"
+             onerror="document.getElementById('logoRing').style.display='none';
+                      document.getElementById('logoFallback').style.display='flex';">
+      </div>
+      <div class="logo-fallback" id="logoFallback">
+        <i class="bi bi-shop"></i>
+      </div>
+      <div class="shop-name">
+        {% if params %}{{ params.nom_boutique }}{% else %}ART Gestion Crédit{% endif %}
+      </div>
+      <div class="shop-sub">Système de Gestion des Crédits</div>
+    </div>
+
+    <div class="login-title">Connexion</div>
+
+    <!-- Erreur -->
+    {% if error %}
+    <div class="alert alert-danger d-flex align-items-center gap-2 mb-3">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      {% if next_url %}
+      <input type="hidden" name="next" value="{{ next_url }}">
+      {% endif %}
+
+      <div class="mb-3">
+        <label class="form-label" for="username">
+          <i class="bi bi-person me-1"></i>Nom d'utilisateur
+        </label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-person-fill"></i></span>
+          <input type="text" id="username" name="username" class="form-control"
+                 placeholder="admin" autocomplete="username" required autofocus>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label" for="password">
+          <i class="bi bi-lock me-1"></i>Mot de passe
+        </label>
+        <div class="pw-wrapper">
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
+            <input type="password" id="password" name="password" class="form-control"
+                   placeholder="••••••••" autocomplete="current-password" required>
+          </div>
+          <button type="button" class="pass-toggle" onclick="togglePass()" title="Afficher/Masquer">
+            <i class="bi bi-eye-fill" id="eyeIcon"></i>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-login">
+        <i class="bi bi-box-arrow-in-right me-2"></i>Se connecter
+      </button>
+    </form>
+
+    <div class="footer-note">
+      ART © 2026 &nbsp;·&nbsp; Connexion sécurisée
+    </div>
+  </div>
+
+  <script>
+    function togglePass() {
+      var inp = document.getElementById('password');
+      var ico = document.getElementById('eyeIcon');
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        ico.className = 'bi bi-eye-slash-fill';
+      } else {
+        inp.type = 'password';
+        ico.className = 'bi bi-eye-fill';
+      }
+    }
+  </script>
+</body>
+</html>
