@@ -961,6 +961,70 @@ def detail_vente(vid):
                            today=date.today().isoformat())
 
 
+@app.route('/ventes/<int:vid>/modifier', methods=['POST'])
+def modifier_vente(vid):
+    conn = get_db()
+    vente = conn.execute('SELECT * FROM ventes WHERE id=?', (vid,)).fetchone()
+    if not vente:
+        conn.close()
+        flash('Crédit introuvable.', 'danger')
+        return redirect(url_for('ventes'))
+    date_vente = request.form.get('date_vente', vente['date_vente']).strip()
+    notes = clean(request.form.get('notes', ''), 500)
+    conn.execute('UPDATE ventes SET date_vente=?, notes=? WHERE id=?',
+                 (date_vente, notes, vid))
+    conn.commit()
+    conn.close()
+    log_action('UPDATE', 'vente', entity_id=vid,
+               details={'date_vente': date_vente, 'notes': notes})
+    flash('Crédit modifié.', 'success')
+    return redirect(url_for('detail_vente', vid=vid))
+
+
+@app.route('/ventes/<int:vid>/supprimer', methods=['POST'])
+def supprimer_vente(vid):
+    conn = get_db()
+    vente = conn.execute('SELECT * FROM ventes WHERE id=?', (vid,)).fetchone()
+    if not vente:
+        conn.close()
+        flash('Crédit introuvable.', 'danger')
+        return redirect(url_for('ventes'))
+    numero = vente['numero']
+    conn.execute('DELETE FROM vente_items WHERE vente_id=?', (vid,))
+    conn.execute('DELETE FROM paiements WHERE vente_id=?', (vid,))
+    conn.execute('DELETE FROM ventes WHERE id=?', (vid,))
+    conn.commit()
+    conn.close()
+    log_action('DELETE', 'vente', entity_id=vid, details={'numero': numero})
+    flash(f'Crédit N°{numero} supprimé définitivement.', 'warning')
+    return redirect(url_for('ventes'))
+
+
+@app.route('/ventes/<int:vid>/paiements/<int:pid>/supprimer', methods=['POST'])
+def supprimer_paiement(vid, pid):
+    conn = get_db()
+    paiement = conn.execute(
+        'SELECT * FROM paiements WHERE id=? AND vente_id=?', (pid, vid)).fetchone()
+    vente = conn.execute('SELECT * FROM ventes WHERE id=?', (vid,)).fetchone()
+    if not paiement or not vente:
+        conn.close()
+        flash('Paiement introuvable.', 'danger')
+        return redirect(url_for('detail_vente', vid=vid))
+    montant = paiement['montant']
+    conn.execute('DELETE FROM paiements WHERE id=?', (pid,))
+    new_paye = max(0.0, vente['montant_paye'] - montant)
+    new_statut = 'solde' if new_paye >= vente['montant_total'] - 0.01 else 'en_cours'
+    conn.execute('UPDATE ventes SET montant_paye=?, statut=? WHERE id=?',
+                 (new_paye, new_statut, vid))
+    conn.commit()
+    conn.close()
+    p = get_params()
+    log_action('DELETE', 'paiement', entity_id=pid,
+               details={'montant': montant, 'vente_id': vid})
+    flash(f'Paiement de {montant:,.0f} {p["devise"]} annulé.', 'warning')
+    return redirect(url_for('detail_vente', vid=vid))
+
+
 @app.route('/ventes/<int:vid>/paiement', methods=['POST'])
 def ajouter_paiement(vid):
     conn = get_db()

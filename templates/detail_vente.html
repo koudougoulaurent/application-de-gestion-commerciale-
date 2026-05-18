@@ -5,7 +5,7 @@
 {% block content %}
 
 <!-- Header statut -->
-<div class="alert {% if vente.statut=='en_cours' %}alert-warning{% else %}alert-success{% endif %} rounded-3 d-flex justify-content-between align-items-center py-2 px-3 mb-3">
+<div class="alert {% if vente.statut=='en_cours' %}alert-warning{% else %}alert-success{% endif %} rounded-3 d-flex justify-content-between align-items-center py-2 px-3 mb-3 flex-wrap gap-2">
   <div>
     <strong>Crédit N° {{ vente.numero }}</strong> ·
     {{ vente.date_vente|fmt_date }} ·
@@ -13,13 +13,23 @@
       {{ vente.client_nom }} {{ vente.client_prenom }}
     </a>
   </div>
-  <div class="d-flex gap-2 align-items-center">
+  <div class="d-flex gap-2 align-items-center flex-wrap">
     <span class="badge badge-{{ vente.statut }} rounded-pill px-3 py-2 fs-6">
       {% if vente.statut=='en_cours' %}Non payé{% else %}Soldé{% endif %}
     </span>
     <a href="{{ url_for('recu', vid=vente.id) }}" class="btn btn-sm btn-outline-secondary" target="_blank">
       <i class="bi bi-printer me-1"></i>Reçu
     </a>
+    <!-- Modifier notes/date -->
+    <button type="button" class="btn btn-sm btn-outline-primary"
+            data-bs-toggle="modal" data-bs-target="#modalModifier">
+      <i class="bi bi-pencil-fill me-1"></i>Modifier
+    </button>
+    <!-- Supprimer crédit -->
+    <button type="button" class="btn btn-sm btn-outline-danger"
+            data-bs-toggle="modal" data-bs-target="#modalSupprimer">
+      <i class="bi bi-trash3-fill me-1"></i>Supprimer
+    </button>
   </div>
 </div>
 
@@ -169,7 +179,8 @@
                 <th class="ps-3">#</th>
                 <th>Date</th>
                 <th>Notes</th>
-                <th class="text-end pe-3">Montant</th>
+                <th class="text-end">Montant</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -178,8 +189,19 @@
                 <td class="ps-3 text-muted small">{{ loop.index }}</td>
                 <td>{{ p.date_paiement|fmt_date }}</td>
                 <td class="text-muted small">{{ p.notes or '—' }}</td>
-                <td class="text-end pe-3 fw-bold text-success">
+                <td class="text-end fw-bold text-success">
                   +{{ p.montant|fmt_money }} {{ params.devise }}
+                </td>
+                <td class="pe-2">
+                  <form method="post"
+                        action="{{ url_for('supprimer_paiement', vid=vente.id, pid=p.id) }}"
+                        onsubmit="return confirm('Annuler ce paiement de {{ p.montant|int }} {{ params.devise }} ?\nLe solde du crédit sera recalculé.')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2"
+                            title="Annuler ce paiement">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                  </form>
                 </td>
               </tr>
               {% endfor %}
@@ -205,4 +227,83 @@
 
   </div>
 </div>
+
+<!-- ══════════ MODAL MODIFIER ══════════ -->
+<div class="modal fade" id="modalModifier" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header"
+           style="background:linear-gradient(135deg,#0d47a1,#1976d2);color:#fff;">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-pencil-fill me-2"></i>Modifier le crédit {{ vente.numero }}
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{{ url_for('modifier_vente', vid=vente.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="modal-body p-4">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Date de la vente</label>
+            <input type="date" name="date_vente" class="form-control"
+                   value="{{ vente.date_vente }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Notes <span class="text-muted fw-normal small">(optionnel)</span></label>
+            <textarea name="notes" class="form-control" rows="3"
+                      placeholder="Modèle, couleur, conditions…">{{ vente.notes or '' }}</textarea>
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-check-circle me-1"></i>Enregistrer
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL SUPPRIMER ══════════ -->
+<div class="modal fade" id="modalSupprimer" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg border-danger">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>Supprimer ce crédit ?
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="alert alert-danger border-danger-subtle py-2 mb-3">
+          <strong>Attention — action irréversible !</strong><br>
+          Le crédit <strong>{{ vente.numero }}</strong> et tous ses paiements associés
+          seront définitivement supprimés.
+        </div>
+        <table class="table table-sm table-borderless mb-0">
+          <tr><td class="text-muted">Client</td>
+              <td class="fw-bold">{{ vente.client_nom }} {{ vente.client_prenom }}</td></tr>
+          <tr><td class="text-muted">Montant total</td>
+              <td class="fw-bold">{{ vente.montant_total|fmt_money }} {{ params.devise }}</td></tr>
+          <tr><td class="text-muted">Statut</td>
+              <td><span class="badge badge-{{ vente.statut }}">
+                {% if vente.statut=='en_cours' %}Non payé{% else %}Soldé{% endif %}
+              </span></td></tr>
+        </table>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          Annuler
+        </button>
+        <form method="post" action="{{ url_for('supprimer_vente', vid=vente.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn btn-danger px-4">
+            <i class="bi bi-trash3-fill me-1"></i>Oui, supprimer définitivement
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
