@@ -3,24 +3,67 @@
 {% block page_title %}Enregistrer un nouveau crédit{% endblock %}
 
 {% block content %}
+<style>
+.prod-btn{
+  border:2px solid #e2e8f0;border-radius:12px;
+  padding:10px 8px;text-align:center;cursor:pointer;
+  background:#fff;transition:all .15s;user-select:none;
+  min-height:72px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;
+  position:relative;
+}
+.prod-btn:hover,.prod-btn:active{border-color:#1976d2;background:#e3f0fd;}
+.prod-btn.in-cart{border-color:#388e3c;background:#e8f5e9;}
+.prod-btn .prod-badge{
+  position:absolute;top:-8px;right:-8px;
+  background:#1976d2;color:#fff;border-radius:50%;
+  width:22px;height:22px;font-size:.72rem;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+}
+.prod-btn .prod-nom{font-weight:600;font-size:.8rem;line-height:1.2;word-break:break-word;}
+.prod-btn .prod-prix{font-size:.75rem;color:#1976d2;font-weight:700;margin-top:2px;}
+.cart-row{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 10px;border-radius:10px;background:#f8fafc;
+  border:1px solid #e2e8f0;margin-bottom:6px;
+}
+.cart-row .cart-nom{flex:1;font-weight:600;font-size:.88rem;}
+.cart-row .qty-ctrl{display:flex;align-items:center;gap:4px;}
+.qty-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid #cbd5e1;
+  background:#fff;font-size:1.1rem;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  transition:background .1s;}
+.qty-btn:hover{background:#e3f0fd;border-color:#1976d2;}
+.qty-val{width:36px;text-align:center;font-weight:700;font-size:.95rem;}
+.cart-prix{font-size:.8rem;color:#475569;min-width:80px;text-align:right;}
+.cat-pill{cursor:pointer;user-select:none;padding:4px 12px;border-radius:20px;
+  font-size:.78rem;font-weight:600;border:1.5px solid #cbd5e1;background:#f8fafc;
+  transition:all .12s;white-space:nowrap;}
+.cat-pill.active{background:#1976d2;color:#fff;border-color:#1976d2;}
+.cat-pills-wrap{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;flex-wrap:nowrap;}
+.cat-pills-wrap::-webkit-scrollbar{height:3px;}
+</style>
+
 <form method="post" id="formVente">
 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<!-- champs dynamiques du panier (remplis par JS) -->
+<div id="cart_inputs"></div>
+
 <div class="row g-3">
 
-  <!-- ─── Colonne gauche : client + dates ─── -->
+  <!-- ─── Colonne gauche ─── -->
   <div class="col-lg-4">
 
-    <!-- Client -->
+    <!-- ① Client -->
     <div class="card mb-3">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-person-fill me-2 text-primary"></i>Client</span>
+        <span><i class="bi bi-person-fill me-2 text-primary"></i>① Client</span>
         <button type="button" class="btn btn-sm btn-success py-0 px-2"
                 data-bs-toggle="modal" data-bs-target="#modalClient">
           <i class="bi bi-person-plus-fill me-1"></i><span class="d-none d-sm-inline">Nouveau</span>
         </button>
       </div>
       <div class="card-body">
-        <!-- Zone recherche -->
         <div id="zone_recherche" style="position:relative;">
           <div class="input-group">
             <span class="input-group-text bg-white border-end-0">
@@ -36,7 +79,6 @@
                       overflow-y:auto;z-index:600;border-radius:0 0 8px 8px;
                       border:1px solid #e2e8f0;border-top:none;"></div>
         </div>
-        <!-- Client confirmé -->
         <div id="client_ok" class="d-none mt-2 p-2 rounded-3
              border border-success-subtle bg-success bg-opacity-10">
           <div class="d-flex justify-content-between align-items-start gap-2">
@@ -55,21 +97,23 @@
       </div>
     </div>
 
-    <!-- Date & Versement -->
+    <!-- ④ Date & Versement -->
     <div class="card mb-3">
-      <div class="card-header"><i class="bi bi-calendar3 me-2 text-primary"></i>Date & Versement</div>
+      <div class="card-header"><i class="bi bi-calendar3 me-2 text-primary"></i>④ Date & versement initial</div>
       <div class="card-body">
         <label class="form-label fw-semibold small">Date de la vente</label>
         <input type="date" name="date_vente" class="form-control mb-3"
                value="{{ today }}" required>
-        <label class="form-label fw-semibold small">Versement initial ({{ params.devise }})</label>
+        <label class="form-label fw-semibold small">
+          Versement initial <span class="text-muted fw-normal">(0 si crédit total)</span>
+        </label>
         <div class="input-group mb-3">
           <input type="number" name="montant_paye_initial" id="inp_initial"
-                 class="form-control" placeholder="0" min="0" step="1"
+                 class="form-control form-control-lg" placeholder="0" min="0" step="1"
                  value="0" inputmode="numeric">
-          <span class="input-group-text">{{ params.devise }}</span>
+          <span class="input-group-text fw-bold">{{ params.devise }}</span>
         </div>
-        <label class="form-label fw-semibold small">Notes</label>
+        <label class="form-label fw-semibold small">Notes <span class="text-muted fw-normal">(optionnel)</span></label>
         <textarea name="notes" class="form-control" rows="2"
                   placeholder="Modèle, couleur, conditions…"></textarea>
       </div>
@@ -97,51 +141,61 @@
 
   </div><!-- /col gauche -->
 
-  <!-- ─── Colonne droite : articles ─── -->
+  <!-- ─── Colonne droite : catalogue + panier ─── -->
   <div class="col-lg-8">
-    <div class="card">
+
+    <!-- ② Sélection des articles -->
+    <div class="card mb-3">
       <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <span><i class="bi bi-cart3 me-2 text-primary"></i>Articles achetés</span>
-        <div class="d-flex gap-2">
-          <button type="button" class="btn btn-sm btn-outline-success"
-                  data-bs-toggle="modal" data-bs-target="#modalProduit"
-                  id="btn_new_produit">
-            <i class="bi bi-plus-square me-1"></i><span class="d-none d-sm-inline">Nouvel article</span>
-          </button>
-          <button type="button" class="btn btn-sm btn-outline-primary" id="btn_add_row">
-            <i class="bi bi-plus-circle me-1"></i><span class="d-none d-sm-inline">Ajouter ligne</span>
-          </button>
-        </div>
+        <span><i class="bi bi-grid-3x3-gap-fill me-2 text-primary"></i>② Appuyez sur un article pour l'ajouter</span>
+        <button type="button" class="btn btn-sm btn-outline-success"
+                data-bs-toggle="modal" data-bs-target="#modalProduit" id="btn_new_produit">
+          <i class="bi bi-plus-square me-1"></i>Nouvel article
+        </button>
       </div>
-      <div class="card-body p-2">
-        <!-- Desktop -->
-        <div class="table-responsive d-none d-md-block">
-          <table class="table mb-0">
-            <thead>
-              <tr>
-                <th style="min-width:200px">Article</th>
-                <th style="width:80px">Qté</th>
-                <th style="width:150px">Prix ({{ params.devise }})</th>
-                <th class="text-end" style="width:130px">Sous-total</th>
-                <th style="width:40px"></th>
-              </tr>
-            </thead>
-            <tbody id="rows_body"></tbody>
-          </table>
+      <div class="card-body pb-2 pt-3 px-3">
+        <!-- Recherche rapide -->
+        <div class="input-group mb-2">
+          <span class="input-group-text bg-white border-end-0">
+            <i class="bi bi-search text-muted"></i>
+          </span>
+          <input type="text" id="prod_search" class="form-control border-start-0"
+                 placeholder="Rechercher un article…" autocomplete="off">
         </div>
-        <!-- Mobile cards -->
-        <div id="rows_mobile" class="d-md-none"></div>
-        <div class="px-2 pb-1 text-muted" style="font-size:.78rem;">
-          <i class="bi bi-lightbulb me-1 text-warning"></i>
-          Choisissez dans le catalogue ou tapez librement. <strong>Nouvel article</strong> pour l'enregistrer.
+        <!-- Filtres catégories -->
+        <div class="cat-pills-wrap mb-3" id="cat_pills"></div>
+        <!-- Grille produits -->
+        <div id="prod_grid" class="row g-2" style="max-height:320px;overflow-y:auto;"></div>
+        <div id="prod_empty" class="text-center py-3 text-muted small d-none">
+          <i class="bi bi-box-seam me-1"></i>Aucun article trouvé
         </div>
       </div>
     </div>
+
+    <!-- ③ Panier -->
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-cart3 me-2 text-success"></i>③ Panier
+          <span id="cart_count" class="badge bg-success rounded-pill ms-1">0</span>
+        </span>
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                id="btn_add_libre">
+          <i class="bi bi-pencil me-1"></i>Article libre
+        </button>
+      </div>
+      <div class="card-body p-2" id="cart_body">
+        <div id="cart_empty" class="text-center py-3 text-muted small">
+          <i class="bi bi-cart-x me-1 fs-4 d-block mb-1"></i>
+          Appuyez sur un article du catalogue ci-dessus
+        </div>
+      </div>
+    </div>
+
     <div class="d-flex gap-2 justify-content-end mt-3">
       <a href="{{ url_for('ventes') }}" class="btn btn-outline-secondary">
         <i class="bi bi-x-circle me-1"></i>Annuler
       </a>
-      <button type="submit" class="btn btn-primary btn-lg px-4">
+      <button type="submit" class="btn btn-primary btn-lg px-4" id="btn_submit">
         <i class="bi bi-check-circle me-1"></i>Enregistrer le crédit
       </button>
     </div>
@@ -276,8 +330,8 @@
 (function(){
   'use strict';
   const DEVISE = "{{ params.devise }}";
-  const produits = JSON.parse(document.getElementById('produits_data').textContent)
-    .map(p => ({ id: p.id, nom: p.nom, prix: p.prix_unitaire, cat: p.categorie||'' }));
+  const allProduits = JSON.parse(document.getElementById('produits_data').textContent)
+    .map(p => ({ id: p.id, nom: p.nom, prix: p.prix_unitaire, cat: p.categorie||'Divers' }));
 
   /* ── utilitaires ── */
   function fmtNum(n){
@@ -384,6 +438,12 @@
       searchInput.classList.add('is-invalid');
       zoneRecherche.style.display=''; clientOk.classList.add('d-none');
       searchInput.focus();
+      return;
+    }
+    if(cart.length === 0){
+      e.preventDefault();
+      document.getElementById('cart_body').scrollIntoView({behavior:'smooth'});
+      showToast('Ajoutez au moins un article avant d\'enregistrer.', 'warning');
     }
   });
 
@@ -392,7 +452,6 @@
   const btnSaveClient = document.getElementById('btn_save_client');
   const clientErr     = document.getElementById('client_modal_err');
 
-  // Bouton "Nouveau" dans la card : pré-remplir avec texte de recherche
   document.querySelector('[data-bs-target="#modalClient"]')?.addEventListener('click', ()=>{
     document.getElementById('mc_nom').value       = searchInput.value.trim();
     document.getElementById('mc_prenom').value    = '';
@@ -433,170 +492,206 @@
   });
   modalClientEl.addEventListener('keydown', e=>{ if(e.key==='Enter') btnSaveClient.click(); });
 
-  /* ═══════════ LIGNES ARTICLES ═══════════ */
-  let rowIdx = 0;
-
-  function buildOptions(){
-    let opts = '<option value="">— Catalogue —</option>';
-    let curCat = '';
-    produits.forEach(p=>{
-      if(p.cat!==curCat){
-        if(curCat) opts+='</optgroup>';
-        curCat=p.cat;
-        opts+=`<optgroup label="${escHtml(p.cat||'Divers')}">`;
-      }
-      opts+=`<option value="${p.id}" data-prix="${p.prix}">${escHtml(p.nom)} — ${fmtNum(p.prix)} ${DEVISE}</option>`;
-    });
-    if(curCat) opts+='</optgroup>';
-    return opts;
+  /* ═══════════ TOAST ═══════════ */
+  function showToast(msg, type='success'){
+    let wrap = document.getElementById('toast_wrap');
+    if(!wrap){
+      wrap = document.createElement('div');
+      wrap.id = 'toast_wrap';
+      wrap.style.cssText = 'position:fixed;bottom:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:6px;';
+      document.body.appendChild(wrap);
+    }
+    const t = document.createElement('div');
+    const colors = {success:'#1b5e20',warning:'#e65100',danger:'#b71c1c'};
+    t.style.cssText = `background:${colors[type]||colors.success};color:#fff;padding:10px 16px;
+      border-radius:10px;font-size:.85rem;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.2);
+      animation:fadeIn .2s;`;
+    t.textContent = msg;
+    wrap.appendChild(t);
+    setTimeout(()=>t.remove(), 2600);
   }
 
-  function refreshAllSelects(){
-    document.querySelectorAll('.sel-cat,.sel-cat-m').forEach(sel=>{
-      const v=sel.value; sel.innerHTML=buildOptions(); if(v) sel.value=v;
-    });
+  /* ═══════════ CATALOGUE — GRILLE ═══════════ */
+  let produits = [...allProduits];
+  let activeCat = 'Tous';
+
+  function buildCatPills(){
+    const cats = ['Tous', ...new Set(allProduits.map(p=>p.cat))];
+    const wrap = document.getElementById('cat_pills');
+    wrap.innerHTML = cats.map(c=>
+      `<span class="cat-pill${c===activeCat?' active':''}" data-cat="${escHtml(c)}">${escHtml(c)}</span>`
+    ).join('');
+    wrap.querySelectorAll('.cat-pill').forEach(pill=>
+      pill.addEventListener('click', ()=>{
+        activeCat = pill.dataset.cat;
+        buildCatPills(); renderGrid();
+      })
+    );
   }
 
-  function addRow(nom='', pid='', prix='', qty=1, focus_=false){
-    const idx = rowIdx++;
-
-    /* — ligne desktop — */
-    const tr = document.createElement('tr');
-    tr.dataset.idx = idx;
-    tr.innerHTML = `
-      <td>
-        <select class="form-select form-select-sm sel-cat mb-1">${buildOptions()}</select>
-        <input type="text" name="produit_nom[]"
-               class="form-control form-control-sm inp-nom"
-               placeholder="Nom libre…" value="${escHtml(nom)}" required>
-        <input type="hidden" name="produit_id[]" class="inp-pid" value="${escHtml(pid)}">
-      </td>
-      <td>
-        <input type="number" name="quantite[]"
-               class="form-control form-control-sm inp-qty"
-               value="${qty}" min="1" step="1" inputmode="numeric">
-      </td>
-      <td>
-        <input type="number" name="prix_unitaire[]"
-               class="form-control form-control-sm inp-prix"
-               value="${escHtml(prix)}" min="0" step="1"
-               placeholder="0" inputmode="numeric">
-      </td>
-      <td class="text-end fw-bold td-sous align-middle">0</td>
-      <td class="align-middle">
-        <button type="button" class="btn btn-sm btn-outline-danger btn-del">
-          <i class="bi bi-trash3"></i>
-        </button>
-      </td>`;
-    document.getElementById('rows_body').appendChild(tr);
-
-    /* — carte mobile — */
-    const mc = document.createElement('div');
-    mc.dataset.mIdx = idx;
-    mc.className = 'border rounded-3 p-3 mb-2 bg-white';
-    mc.innerHTML = `
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <strong class="text-primary small">Article ${idx+1}</strong>
-        <button type="button" class="btn btn-sm btn-outline-danger btn-del-m py-0 px-2">
-          <i class="bi bi-trash3"></i>
-        </button>
-      </div>
-      <div class="mb-2">
-        <label class="form-label small fw-semibold mb-1">Catalogue</label>
-        <select class="form-select form-select-sm sel-cat-m">${buildOptions()}</select>
-      </div>
-      <div class="mb-2">
-        <label class="form-label small fw-semibold mb-1">Nom de l'article</label>
-        <input type="text" class="form-control form-control-sm inp-nom-m"
-               placeholder="Nom libre…" value="${escHtml(nom)}">
-      </div>
-      <div class="row g-2">
-        <div class="col-5">
-          <label class="form-label small fw-semibold mb-1">Quantité</label>
-          <input type="number" class="form-control form-control-sm inp-qty-m"
-                 value="${qty}" min="1" step="1" inputmode="numeric">
+  function renderGrid(){
+    const q = document.getElementById('prod_search').value.toLowerCase().trim();
+    const filtered = allProduits.filter(p=>{
+      const matchCat = activeCat==='Tous' || p.cat===activeCat;
+      const matchQ   = !q || p.nom.toLowerCase().includes(q) || p.cat.toLowerCase().includes(q);
+      return matchCat && matchQ;
+    });
+    const grid = document.getElementById('prod_grid');
+    const empty = document.getElementById('prod_empty');
+    if(!filtered.length){
+      grid.innerHTML=''; empty.classList.remove('d-none'); return;
+    }
+    empty.classList.add('d-none');
+    grid.innerHTML = filtered.map(p=>{
+      const inCart = cart.find(c=>c.id===p.id);
+      const qty = inCart ? inCart.qty : 0;
+      return `<div class="col-6 col-sm-4 col-md-3">
+        <div class="prod-btn${qty>0?' in-cart':''}" data-pid="${p.id}"
+             data-nom="${escHtml(p.nom)}" data-prix="${p.prix}">
+          ${qty>0?`<span class="prod-badge">${qty}</span>`:''}
+          <span class="prod-nom">${escHtml(p.nom)}</span>
+          <span class="prod-prix">${fmtNum(p.prix)} ${DEVISE}</span>
         </div>
-        <div class="col-7">
-          <label class="form-label small fw-semibold mb-1">Prix ({{ params.devise }})</label>
-          <input type="number" class="form-control form-control-sm inp-prix-m"
-                 value="${escHtml(prix)}" min="0" step="1" placeholder="0" inputmode="numeric">
-        </div>
-      </div>
-      <div class="text-end mt-2 fw-bold text-primary td-sous-m" style="font-size:.82rem;">
-        Sous-total : 0 {{ params.devise }}
       </div>`;
-    document.getElementById('rows_mobile').appendChild(mc);
-
-    /* — refs — */
-    const selCat=tr.querySelector('.sel-cat'), inpNom=tr.querySelector('.inp-nom'),
-          inpQty=tr.querySelector('.inp-qty'), inpPrix=tr.querySelector('.inp-prix'),
-          inpPid=tr.querySelector('.inp-pid');
-    const selCatM=mc.querySelector('.sel-cat-m'), inpNomM=mc.querySelector('.inp-nom-m'),
-          inpQtyM=mc.querySelector('.inp-qty-m'), inpPrixM=mc.querySelector('.inp-prix-m');
-
-    /* desktop select → sync + recalc */
-    selCat.addEventListener('change', ()=>{
-      const opt=selCat.selectedOptions[0];
-      if(opt&&opt.value){
-        inpNom.value=opt.textContent.split(' — ')[0].trim();
-        inpPid.value=opt.value; inpPrix.value=opt.dataset.prix||0;
-        selCatM.value=opt.value; inpNomM.value=inpNom.value; inpPrixM.value=inpPrix.value;
-        setTimeout(()=>inpQty.focus(),40);
-      } else inpPid.value='';
-      recalc();
+    }).join('');
+    grid.querySelectorAll('.prod-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        addToCart(Number(btn.dataset.pid), btn.dataset.nom, Number(btn.dataset.prix));
+      });
     });
-    /* mobile select → sync */
-    selCatM.addEventListener('change', ()=>{
-      const opt=selCatM.selectedOptions[0];
-      if(opt&&opt.value){
-        inpNomM.value=opt.textContent.split(' — ')[0].trim();
-        inpPrixM.value=opt.dataset.prix||0;
-        inpNom.value=inpNomM.value; inpPrix.value=inpPrixM.value;
-        inpPid.value=opt.value; selCat.value=opt.value;
-      } else inpPid.value='';
-      recalc();
-    });
-    [inpQty,inpPrix].forEach(el=>el.addEventListener('input',()=>{
-      inpQtyM.value=inpQty.value; inpPrixM.value=inpPrix.value; recalc();
-    }));
-    [inpQtyM,inpPrixM].forEach(el=>el.addEventListener('input',()=>{
-      inpQty.value=inpQtyM.value; inpPrix.value=inpPrixM.value; recalc();
-    }));
-    inpNom.addEventListener('input',()=>{ inpNomM.value=inpNom.value; });
-    inpNomM.addEventListener('input',()=>{ inpNom.value=inpNomM.value; });
+  }
 
-    const delFn=()=>{ tr.remove(); mc.remove(); recalc(); };
-    tr.querySelector('.btn-del').addEventListener('click',delFn);
-    mc.querySelector('.btn-del-m').addEventListener('click',delFn);
+  document.getElementById('prod_search').addEventListener('input', renderGrid);
 
-    if(pid){ selCat.value=pid; selCatM.value=pid; inpPid.value=pid; }
-    if(focus_) setTimeout(()=>selCat.focus(),60);
+  /* ═══════════ PANIER (CART) ═══════════ */
+  let cart = []; // [{id, nom, prix, qty, libre}]
+
+  function addToCart(id, nom, prix, qty=1, libre=false){
+    const existing = cart.find(c=>c.id===id && !c.libre);
+    if(existing && !libre){
+      existing.qty += qty;
+      showToast(`+${qty} — ${nom} (total : ${existing.qty})`, 'success');
+    } else {
+      // article libre ou nouveau produit catalogue
+      cart.push({id: libre ? ('libre_'+Date.now()) : id, nom, prix, qty, libre});
+    }
+    renderCart();
+    renderGrid();
     recalc();
   }
 
-  function recalc(){
-    let total=0;
-    document.querySelectorAll('#rows_body tr').forEach(tr=>{
-      const qty=parseFloat(tr.querySelector('.inp-qty')?.value)||0;
-      const prix=parseFloat(tr.querySelector('.inp-prix')?.value)||0;
-      const sous=qty*prix; total+=sous;
-      const tdS=tr.querySelector('.td-sous'); if(tdS) tdS.textContent=fmtNum(sous)+' '+DEVISE;
-      /* sync mobile sous-total */
-      const mc=document.querySelector(`[data-m-idx="${tr.dataset.idx}"]`);
-      const mS=mc?.querySelector('.td-sous-m');
-      if(mS) mS.textContent='Sous-total : '+fmtNum(sous)+' '+DEVISE;
-    });
-    const initial=Math.min(parseFloat(document.getElementById('inp_initial').value)||0, total);
-    const reste=Math.max(0,total-initial);
-    document.getElementById('lbl_total').textContent=fmtNum(total);
-    document.getElementById('lbl_initial').textContent=fmtNum(initial)+' '+DEVISE;
-    const lr=document.getElementById('lbl_reste');
-    lr.textContent=fmtNum(reste)+' '+DEVISE;
-    lr.className='fw-bold '+(reste>0?'text-danger':'text-success');
+  function removeFromCart(cartId){
+    cart = cart.filter(c=>String(c.id)!==String(cartId));
+    renderCart(); renderGrid(); recalc();
   }
 
-  document.getElementById('btn_add_row').addEventListener('click',()=>addRow('','','',1,true));
-  document.getElementById('inp_initial').addEventListener('input',recalc);
+  function setQty(cartId, qty){
+    qty = Math.max(1, parseInt(qty)||1);
+    const item = cart.find(c=>String(c.id)===String(cartId));
+    if(item){ item.qty=qty; renderCart(); renderGrid(); recalc(); }
+  }
+
+  function setPrix(cartId, prix){
+    prix = Math.max(0, parseFloat(prix)||0);
+    const item = cart.find(c=>String(c.id)===String(cartId));
+    if(item){ item.prix=prix; renderCart(); recalc(); }
+  }
+
+  function renderCart(){
+    const body  = document.getElementById('cart_body');
+    const empty = document.getElementById('cart_empty');
+    document.getElementById('cart_count').textContent = cart.reduce((s,c)=>s+c.qty,0);
+    if(!cart.length){
+      body.innerHTML=''; body.appendChild(empty); empty.classList.remove('d-none'); return;
+    }
+    empty.classList.add('d-none');
+    body.innerHTML = cart.map(item=>`
+      <div class="cart-row" data-cid="${item.id}">
+        <div class="cart-nom">
+          ${item.libre
+            ? `<input type="text" class="form-control form-control-sm inp-libre-nom"
+                      value="${escHtml(item.nom)}" placeholder="Nom de l'article…"
+                      style="font-weight:600;font-size:.85rem;">`
+            : `<span>${escHtml(item.nom)}</span>`}
+          ${item.libre
+            ? `<div class="input-group input-group-sm mt-1" style="max-width:140px;">
+                 <input type="number" class="form-control inp-libre-prix"
+                        value="${item.prix}" min="0" step="1" inputmode="numeric"
+                        placeholder="Prix…">
+                 <span class="input-group-text">${DEVISE}</span>
+               </div>`
+            : `<small class="text-muted">${fmtNum(item.prix)} ${DEVISE}/u</small>`}
+        </div>
+        <div class="qty-ctrl">
+          <button type="button" class="qty-btn btn-minus">−</button>
+          <span class="qty-val">${item.qty}</span>
+          <button type="button" class="qty-btn btn-plus">+</button>
+        </div>
+        <div class="cart-prix fw-bold text-primary">
+          ${fmtNum(item.prix * item.qty)} ${DEVISE}
+        </div>
+        <button type="button" class="qty-btn btn-del-cart"
+                style="color:#dc3545;border-color:#dc3545;">
+          <i class="bi bi-trash3" style="font-size:.75rem;"></i>
+        </button>
+      </div>`).join('');
+
+    /* événements panier */
+    body.querySelectorAll('.cart-row').forEach(row=>{
+      const cid = row.dataset.cid;
+      row.querySelector('.btn-minus').addEventListener('click', ()=>{
+        const item=cart.find(c=>String(c.id)===cid);
+        if(item && item.qty>1) setQty(cid, item.qty-1);
+        else removeFromCart(cid);
+      });
+      row.querySelector('.btn-plus').addEventListener('click', ()=>{
+        const item=cart.find(c=>String(c.id)===cid);
+        if(item) setQty(cid, item.qty+1);
+      });
+      row.querySelector('.btn-del-cart').addEventListener('click', ()=>removeFromCart(cid));
+      const inpNom = row.querySelector('.inp-libre-nom');
+      if(inpNom) inpNom.addEventListener('input', ()=>{
+        const item=cart.find(c=>String(c.id)===cid);
+        if(item){ item.nom=inpNom.value; recalc(); }
+      });
+      const inpPrix = row.querySelector('.inp-libre-prix');
+      if(inpPrix) inpPrix.addEventListener('change', ()=>setPrix(cid, inpPrix.value));
+    });
+
+    /* sync inputs cachés */
+    syncHiddenInputs();
+  }
+
+  function syncHiddenInputs(){
+    const wrap = document.getElementById('cart_inputs');
+    wrap.innerHTML = cart.map(item=>`
+      <input type="hidden" name="produit_nom[]" value="${escHtml(item.nom)}">
+      <input type="hidden" name="produit_id[]"  value="${item.libre ? '' : item.id}">
+      <input type="hidden" name="quantite[]"    value="${item.qty}">
+      <input type="hidden" name="prix_unitaire[]" value="${item.prix}">
+    `).join('');
+  }
+
+  /* ═══════════ ARTICLE LIBRE ═══════════ */
+  document.getElementById('btn_add_libre').addEventListener('click', ()=>{
+    addToCart('libre_'+Date.now(), '', 0, 1, true);
+    // Scroll vers le panier
+    document.getElementById('cart_body').scrollIntoView({behavior:'smooth', block:'nearest'});
+  });
+
+  /* ═══════════ RECALCUL TOTAUX ═══════════ */
+  function recalc(){
+    syncHiddenInputs();
+    const total = cart.reduce((s,c)=>s+c.qty*c.prix, 0);
+    const initial = Math.min(parseFloat(document.getElementById('inp_initial').value)||0, total);
+    const reste = Math.max(0, total-initial);
+    document.getElementById('lbl_total').textContent   = fmtNum(total);
+    document.getElementById('lbl_initial').textContent = fmtNum(initial)+' '+DEVISE;
+    const lr = document.getElementById('lbl_reste');
+    lr.textContent = fmtNum(reste)+' '+DEVISE;
+    lr.className = 'fw-bold '+(reste>0?'text-danger':'text-success');
+  }
+  document.getElementById('inp_initial').addEventListener('input', recalc);
 
   /* ═══════════ MODAL PRODUIT ═══════════ */
   const modalProduitEl = document.getElementById('modalProduit');
@@ -627,10 +722,15 @@
       const resp = await fetch('/api/produits/creer',{method:'POST',body:fd});
       const data = await resp.json();
       if(!resp.ok) throw new Error(data.error||'Erreur serveur');
-      produits.push({id:data.id, nom:data.nom, prix:data.prix_unitaire, cat:data.categorie||''});
-      refreshAllSelects();
+      const newP = {id:data.id, nom:data.nom, prix:data.prix_unitaire, cat:data.categorie||'Divers'};
+      allProduits.push(newP);
+      buildCatPills();
       bootstrap.Modal.getInstance(modalProduitEl).hide();
-      if(doAdd) addRow(data.nom, String(data.id), String(data.prix_unitaire), 1, false);
+      if(doAdd){
+        addToCart(newP.id, newP.nom, newP.prix);
+        showToast(`"${nom}" ajouté au panier`, 'success');
+      }
+      renderGrid();
     } catch(err){ produitErr.textContent=err.message; produitErr.classList.remove('d-none'); }
     finally {
       btnSaveProduit.disabled=false;
@@ -640,7 +740,8 @@
   modalProduitEl.addEventListener('keydown', e=>{ if(e.key==='Enter') btnSaveProduit.click(); });
 
   /* ═══════════ INIT ═══════════ */
-  addRow();
+  buildCatPills();
+  renderGrid();
 
   {% if request.args.get('client_id') %}
   (async function(){
