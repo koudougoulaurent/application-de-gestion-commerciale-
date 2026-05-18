@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Modifier' if user else 'Nouvel' }} utilisateur{% endblock %}
+{% block page_title %}
+  <i class="bi bi-person-fill me-1"></i>
+  {{ 'Modifier l\'utilisateur' if user else 'Nouvel utilisateur' }}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-person-fill me-2 text-primary"></i>
+        {{ 'Modifier — ' + user.username if user else 'Créer un compte' }}
+      </div>
+      <div class="card-body p-4">
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Nom d'utilisateur <span class="text-danger">*</span></label>
+            <input type="text" name="username" class="form-control"
+                   value="{{ user.username if user else '' }}"
+                   placeholder="ex: alice" required autocomplete="username">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">
+              Mot de passe {% if not user %}<span class="text-danger">*</span>{% else %}<small class="text-muted fw-normal">(laisser vide = inchangé)</small>{% endif %}
+            </label>
+            <input type="password" name="{{ 'password' if not user else 'password_new' }}"
+                   class="form-control"
+                   placeholder="Minimum 4 caractères"
+                   autocomplete="new-password"
+                   {% if not user %}required minlength="4"{% else %}minlength="4"{% endif %}>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Rôle</label>
+            <select name="role" class="form-select">
+              <option value="admin"  {% if user and user.role == 'admin'  %}selected{% endif %}>
+                🛡 Admin — accès complet
+              </option>
+              <option value="user" {% if user and user.role == 'user' %}selected{% endif %}>
+                👤 Utilisateur — accès métier uniquement
+              </option>
+            </select>
+          </div>
+
+          <hr class="my-3"/>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary flex-grow-1">
+              <i class="bi bi-check-circle me-1"></i>
+              {{ 'Enregistrer les modifications' if user else 'Créer l\'utilisateur' }}
+            </button>
+            <a href="{{ url_for('admin_utilisateurs') }}" class="btn btn-outline-secondary">
+              Annuler
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

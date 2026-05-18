@@ -5,6 +5,8 @@ import os
 import re
 import secrets
 import sqlite3
+import json
+import functools
 from datetime import datetime, date
 
 app = Flask(__name__)
@@ -125,6 +127,7 @@ def inject_globals():
         'alertes': alertes,
         'nb_alertes': len(alertes),
         'current_username': session.get('username', ''),
+        'current_role':    session.get('role', ''),
     }
 
 
@@ -302,8 +305,22 @@ def init_db():
             """CREATE TABLE IF NOT EXISTS users (
                 id       SERIAL PRIMARY KEY,
                 username TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL
+                password TEXT NOT NULL,
+                role     TEXT NOT NULL DEFAULT 'admin'
             )""",
+            """CREATE TABLE IF NOT EXISTS audit_log (
+                id          SERIAL PRIMARY KEY,
+                user_id     INTEGER,
+                username    TEXT NOT NULL,
+                action      TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id   INTEGER,
+                details     TEXT,
+                ip_address  TEXT,
+                created_at  TIMESTAMPTZ DEFAULT NOW()
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity_type, entity_id)",
         ]
         for stmt in ddl:
             cur.execute(stmt)
@@ -377,8 +394,22 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 id       INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL
+                password TEXT NOT NULL,
+                role     TEXT NOT NULL DEFAULT 'admin'
             );
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id     INTEGER,
+                username    TEXT NOT NULL,
+                action      TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id   INTEGER,
+                details     TEXT,
+                ip_address  TEXT,
+                created_at  TEXT DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
+            CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity_type, entity_id);
         ''')
         conn.commit()
         conn.close()
@@ -391,7 +422,7 @@ def seed_admin():
         n = conn.execute('SELECT COUNT(*) AS n FROM users').fetchone()['n']
         if n == 0:
             pw = generate_password_hash('admin')
-            conn.execute('INSERT INTO users (username, password) VALUES (?,?)', ('admin', pw))
+            conn.execute('INSERT INTO users (username, password, role) VALUES (?,?,?)', ('admin', pw, 'admin'))
             conn.commit()
         conn.close()
     except Exception as e:
@@ -411,6 +442,89 @@ def gen_numero():
     count = conn.execute('SELECT COUNT(*) AS n FROM ventes').fetchone()['n'] + 1
     conn.close()
     return f"CR{now.strftime('%Y%m')}{count:04d}"
+
+
+# ───────────────────────────────── AUDIT & SÉCURITÉ ─────────────────────────────────
+
+def log_action(action, entity_type, entity_id=None, details=None):
+    """Enregistre une action dans le journal d'audit."""
+    try:
+        conn = get_db()
+        conn.execute(
+            'INSERT INTO audit_log '
+            '(user_id, username, action, entity_type, entity_id, details, ip_address) '
+            'VALUES (?,?,?,?,?,?,?)',
+            (
+                session.get('user_id'),
+                session.get('username', 'système'),
+                action,
+                entity_type,
+                entity_id,
+                json.dumps(details, ensure_ascii=False) if details else None,
+                request.remote_addr,
+            )
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f'[audit] {e}')
+
+
+def admin_required(f):
+    """Décorateur : réservé aux utilisateurs avec role=admin."""
+    @functools.wraps(f)
+    def decorated(*args, **kwargs):
+        if session.get('role') != 'admin':
+            flash("Accès réservé à l'administrateur.", 'danger')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def migrate_db():
+    """Migrations de schéma pour les bases de données existantes (colonnes ajoutées)."""
+    try:
+        conn = get_db()
+        if USE_PG:
+            for stmt in [
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'admin'",
+                """CREATE TABLE IF NOT EXISTS audit_log (
+                    id          SERIAL PRIMARY KEY,
+                    user_id     INTEGER,
+                    username    TEXT NOT NULL,
+                    action      TEXT NOT NULL,
+                    entity_type TEXT NOT NULL,
+                    entity_id   INTEGER,
+                    details     TEXT,
+                    ip_address  TEXT,
+                    created_at  TIMESTAMPTZ DEFAULT NOW()
+                )""",
+                "CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC)",
+                "CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity_type, entity_id)",
+            ]:
+                conn.execute(stmt)
+        else:
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'")
+            except Exception:
+                pass  # colonne déjà présente
+            conn.execute("""CREATE TABLE IF NOT EXISTS audit_log (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id     INTEGER,
+                username    TEXT NOT NULL,
+                action      TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id   INTEGER,
+                details     TEXT,
+                ip_address  TEXT,
+                created_at  TEXT DEFAULT (datetime('now'))
+            )""")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity_type, entity_id)")
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f'[migrate_db] {e}')
 
 
 # ───────────────────────────────── FILTRES JINJA ─────────────────────────────────
@@ -448,6 +562,8 @@ def login():
         if user and check_password_hash(user['password'], password):
             session['user_id'] = user['id']
             session['username'] = user['username']
+            session['role'] = user.get('role', 'admin')
+            log_action('LOGIN', 'auth', details={'ip': request.remote_addr})
             next_url = request.form.get('next') or request.args.get('next') or url_for('dashboard')
             # Sécurité : ne rediriger que vers des chemins relatifs
             if next_url.startswith('/') and not next_url.startswith('//'):
@@ -461,8 +577,10 @@ def login():
 
 @app.route('/logout')
 def logout():
+    log_action('LOGOUT', 'auth')
     session.pop('user_id', None)
     session.pop('username', None)
+    session.pop('role', None)
     flash('Vous avez été déconnecté.', 'info')
     return redirect(url_for('login'))
 
@@ -551,6 +669,7 @@ def ajouter_client():
                      (nom, prenom, telephone, adresse))
         conn.commit()
         conn.close()
+        log_action('CREATE', 'client', details={'nom': nom, 'prenom': prenom, 'telephone': telephone})
         flash(f'Client {nom} {prenom} ajouté avec succès!', 'success')
         return redirect(url_for('clients'))
     return render_template('client_form.html', client=None, params=get_params())
@@ -576,6 +695,7 @@ def modifier_client(cid):
                      (nom, prenom, telephone, adresse, cid))
         conn.commit()
         conn.close()
+        log_action('UPDATE', 'client', entity_id=cid, details={'nom': nom, 'prenom': prenom, 'telephone': telephone})
         flash('Client modifié avec succès!', 'success')
         return redirect(url_for('detail_client', cid=cid))
     params = get_params()
@@ -644,6 +764,7 @@ def ajouter_produit():
                      (nom, categorie, prix, description))
         conn.commit()
         conn.close()
+        log_action('CREATE', 'produit', details={'nom': nom, 'categorie': categorie, 'prix': prix})
         flash(f'Produit "{nom}" ajouté!', 'success')
         return redirect(url_for('produits'))
     return render_template('produit_form.html', produit=None, params=get_params())
@@ -670,6 +791,7 @@ def modifier_produit(pid):
                      (nom, categorie, prix, description, pid))
         conn.commit()
         conn.close()
+        log_action('UPDATE', 'produit', entity_id=pid, details={'nom': nom, 'categorie': categorie, 'prix': prix})
         flash('Produit modifié!', 'success')
         return redirect(url_for('produits'))
     params = get_params()
@@ -683,6 +805,7 @@ def supprimer_produit(pid):
     conn.execute('UPDATE produits SET actif=0 WHERE id=?', (pid,))
     conn.commit()
     conn.close()
+    log_action('DELETE', 'produit', entity_id=pid)
     flash('Produit archivé.', 'info')
     return redirect(url_for('produits'))
 
@@ -798,6 +921,8 @@ def nouvelle_vente():
 
         conn.commit()
         conn.close()
+        log_action('CREATE', 'vente', entity_id=vente_id,
+                   details={'numero': numero, 'montant': montant_total, 'statut': statut})
         flash(f'Crédit N°{numero} enregistré avec succès!', 'success')
         if statut == 'solde':
             return redirect(url_for('recu', vid=vente_id))
@@ -869,7 +994,8 @@ def ajouter_paiement(vid):
                  (new_paye, new_statut, vid))
     conn.commit()
     conn.close()
-
+    log_action('CREATE', 'paiement', entity_id=vid,
+               details={'montant': montant, 'date': date_paiement, 'statut': new_statut})
     if new_statut == 'solde':
         flash(f'Paiement enregistré. Crédit entièrement SOLDÉ! Reçu généré.', 'success')
         return redirect(url_for('recu', vid=vid))
@@ -923,6 +1049,7 @@ def parametres():
         ''', (nom_boutique, adresse_boutique, telephone_boutique, devise, proprietaire))
         conn.commit()
         conn.close()
+        log_action('UPDATE', 'parametres', details={'nom_boutique': nom_boutique, 'devise': devise})
         flash('Paramètres sauvegardés avec succès!', 'success')
         return redirect(url_for('parametres'))
     params = get_params()
@@ -952,8 +1079,139 @@ def changer_mot_de_passe():
                  (generate_password_hash(nouveau), user_id))
     conn.commit()
     conn.close()
+    log_action('UPDATE', 'user', entity_id=user_id, details={'action': 'password_change'})
     flash('Mot de passe modifié avec succès !', 'success')
     return redirect(url_for('parametres'))
+
+
+# ───────────────────────────────── ADMINISTRATION ─────────────────────────────────
+
+@app.route('/admin/utilisateurs')
+@admin_required
+def admin_utilisateurs():
+    conn = get_db()
+    users = conn.execute('SELECT id, username, role FROM users ORDER BY username').fetchall()
+    conn.close()
+    return render_template('admin/utilisateurs.html', users=users, params=get_params())
+
+
+@app.route('/admin/utilisateurs/ajouter', methods=['GET', 'POST'])
+@admin_required
+def admin_ajouter_utilisateur():
+    if request.method == 'POST':
+        username = clean(request.form.get('username', ''), 50)
+        password = request.form.get('password', '').strip()
+        role = request.form.get('role', 'user')
+        if role not in ('admin', 'user'):
+            role = 'user'
+        if not username or len(password) < 4:
+            flash("Nom d'utilisateur et mot de passe (min 4 car.) obligatoires.", 'danger')
+            return render_template('admin/user_form.html', user=None, params=get_params())
+        conn = get_db()
+        if conn.execute('SELECT id FROM users WHERE username=?', (username,)).fetchone():
+            conn.close()
+            flash(f"L'utilisateur « {username} » existe déjà.", 'danger')
+            return render_template('admin/user_form.html', user=None, params=get_params())
+        conn.execute('INSERT INTO users (username, password, role) VALUES (?,?,?)',
+                     (username, generate_password_hash(password), role))
+        conn.commit()
+        conn.close()
+        log_action('CREATE', 'user', details={'username': username, 'role': role})
+        flash(f'Utilisateur « {username} » créé avec succès.', 'success')
+        return redirect(url_for('admin_utilisateurs'))
+    return render_template('admin/user_form.html', user=None, params=get_params())
+
+
+@app.route('/admin/utilisateurs/<int:uid>/modifier', methods=['GET', 'POST'])
+@admin_required
+def admin_modifier_utilisateur(uid):
+    conn = get_db()
+    user = conn.execute('SELECT id, username, role FROM users WHERE id=?', (uid,)).fetchone()
+    if not user:
+        conn.close()
+        flash('Utilisateur introuvable.', 'danger')
+        return redirect(url_for('admin_utilisateurs'))
+    if request.method == 'POST':
+        username = clean(request.form.get('username', ''), 50)
+        role = request.form.get('role', 'user')
+        if role not in ('admin', 'user'):
+            role = 'user'
+        password_new = request.form.get('password_new', '').strip()
+        if not username:
+            flash("Le nom d'utilisateur est obligatoire.", 'danger')
+            conn.close()
+            return render_template('admin/user_form.html', user=user, params=get_params())
+        if password_new:
+            if len(password_new) < 4:
+                flash('Le mot de passe doit contenir au moins 4 caractères.', 'danger')
+                conn.close()
+                return render_template('admin/user_form.html', user=user, params=get_params())
+            conn.execute('UPDATE users SET username=?, role=?, password=? WHERE id=?',
+                         (username, role, generate_password_hash(password_new), uid))
+        else:
+            conn.execute('UPDATE users SET username=?, role=? WHERE id=?', (username, role, uid))
+        conn.commit()
+        conn.close()
+        log_action('UPDATE', 'user', entity_id=uid, details={'username': username, 'role': role})
+        flash(f'Utilisateur « {username} » modifié.', 'success')
+        return redirect(url_for('admin_utilisateurs'))
+    params = get_params()
+    conn.close()
+    return render_template('admin/user_form.html', user=user, params=params)
+
+
+@app.route('/admin/utilisateurs/<int:uid>/supprimer', methods=['POST'])
+@admin_required
+def admin_supprimer_utilisateur(uid):
+    if uid == session.get('user_id'):
+        flash('Vous ne pouvez pas supprimer votre propre compte.', 'danger')
+        return redirect(url_for('admin_utilisateurs'))
+    conn = get_db()
+    user = conn.execute('SELECT username FROM users WHERE id=?', (uid,)).fetchone()
+    if user:
+        conn.execute('DELETE FROM users WHERE id=?', (uid,))
+        conn.commit()
+        log_action('DELETE', 'user', entity_id=uid, details={'username': user['username']})
+        flash(f"Utilisateur « {user['username']} » supprimé.", 'success')
+    conn.close()
+    return redirect(url_for('admin_utilisateurs'))
+
+
+@app.route('/admin/journal')
+@admin_required
+def admin_journal():
+    conn = get_db()
+    f_user   = request.args.get('user', '').strip()
+    f_action = request.args.get('action', '').strip()
+    f_entity = request.args.get('entity', '').strip()
+    try:
+        page = max(1, int(request.args.get('page', 1)))
+    except ValueError:
+        page = 1
+    per_page = 50
+    sql = 'SELECT * FROM audit_log WHERE 1=1'
+    params_q = []
+    if f_user:
+        sql += ' AND username=?'
+        params_q.append(f_user)
+    if f_action:
+        sql += ' AND action=?'
+        params_q.append(f_action)
+    if f_entity:
+        sql += ' AND entity_type=?'
+        params_q.append(f_entity)
+    total = conn.execute(sql.replace('SELECT *', 'SELECT COUNT(*) AS n'), params_q).fetchone()['n']
+    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+    logs = conn.execute(sql, params_q + [per_page, (page - 1) * per_page]).fetchall()
+    users_list = conn.execute(
+        'SELECT DISTINCT username FROM audit_log ORDER BY username').fetchall()
+    conn.close()
+    pages = max(1, (total + per_page - 1) // per_page)
+    return render_template('admin/journal.html',
+                           logs=logs, total=total, page=page, pages=pages,
+                           users_list=users_list,
+                           f_user=f_user, f_action=f_action, f_entity=f_entity,
+                           params=get_params())
 
 
 # ───────────────────────────────── API JSON ─────────────────────────────────
@@ -1070,10 +1328,12 @@ def offline_page():
 # Initialise les tables au démarrage (gunicorn ou python direct)
 if DATABASE_URL:
     init_db()
+    migrate_db()
     seed_admin()
 else:
     # SQLite — init locale au premier lancement
     init_db()
+    migrate_db()
     seed_admin()
 
 if __name__ == '__main__':

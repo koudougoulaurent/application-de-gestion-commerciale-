@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+{% block title %}Journal d'audit{% endblock %}
+{% block page_title %}<i class="bi bi-journal-text me-1"></i> Journal d'audit{% endblock %}
+
+{% block content %}
+
+{# ── Filtres ── #}
+<div class="card mb-3">
+  <div class="card-body py-3 px-4">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-3">
+        <label class="form-label fw-semibold small mb-1">Utilisateur</label>
+        <select name="user" class="form-select form-select-sm">
+          <option value="">Tous</option>
+          {% for u in users_list %}
+          <option value="{{ u.username }}" {% if f_user == u.username %}selected{% endif %}>
+            {{ u.username }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-3">
+        <label class="form-label fw-semibold small mb-1">Action</label>
+        <select name="action" class="form-select form-select-sm">
+          <option value="">Toutes</option>
+          {% for a in ['LOGIN','LOGOUT','CREATE','UPDATE','DELETE'] %}
+          <option value="{{ a }}" {% if f_action == a %}selected{% endif %}>{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-3">
+        <label class="form-label fw-semibold small mb-1">Type d'entité</label>
+        <select name="entity" class="form-select form-select-sm">
+          <option value="">Tous</option>
+          {% for e in ['auth','client','produit','vente','paiement','user','parametres'] %}
+          <option value="{{ e }}" {% if f_entity == e %}selected{% endif %}>{{ e }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-3 d-flex gap-2">
+        <button type="submit" class="btn btn-sm btn-primary flex-grow-1">
+          <i class="bi bi-funnel-fill me-1"></i>Filtrer
+        </button>
+        <a href="{{ url_for('admin_journal') }}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-x-lg"></i>
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Tableau ── #}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-list-ul me-2 text-primary"></i>Événements</span>
+    <span class="badge bg-secondary rounded-pill">{{ total }} entrée{{ 's' if total != 1 }}</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-mobile mb-0" style="font-size:.83rem;">
+        <thead>
+          <tr>
+            <th>Date / Heure</th>
+            <th>Utilisateur</th>
+            <th>Action</th>
+            <th>Entité</th>
+            <th>ID</th>
+            <th>Détails</th>
+            <th>IP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td data-label="Date">
+              <span class="text-muted" style="font-size:.78rem;">
+                {{ log.created_at | fmt_date if log.created_at else '—' }}
+                {% if log.created_at %}
+                <br><small>{{ log.created_at | string | truncate(19, True, '') | replace('T',' ') }}</small>
+                {% endif %}
+              </span>
+            </td>
+            <td data-label="Utilisateur">
+              <i class="bi bi-person-circle me-1 text-secondary"></i>
+              <strong>{{ log.username }}</strong>
+            </td>
+            <td data-label="Action">
+              {% set colors = {'LOGIN':'success','LOGOUT':'secondary','CREATE':'primary','UPDATE':'warning','DELETE':'danger'} %}
+              {% set icons  = {'LOGIN':'box-arrow-in-right','LOGOUT':'box-arrow-right','CREATE':'plus-circle-fill','UPDATE':'pencil-fill','DELETE':'trash3-fill'} %}
+              <span class="badge bg-{{ colors.get(log.action, 'secondary') }}" style="font-size:.7rem;">
+                <i class="bi bi-{{ icons.get(log.action, 'circle') }} me-1"></i>
+                {{ log.action }}
+              </span>
+            </td>
+            <td data-label="Entité">
+              <code style="font-size:.78rem;color:#475569;">{{ log.entity_type }}</code>
+            </td>
+            <td data-label="ID">
+              {% if log.entity_id %}
+              <span class="text-muted">#{{ log.entity_id }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td data-label="Détails" style="max-width:220px;">
+              {% if log.details %}
+              <small class="text-muted" style="word-break:break-all;">
+                {{ log.details | truncate(80) }}
+              </small>
+              {% else %}—{% endif %}
+            </td>
+            <td data-label="IP">
+              <small class="text-muted font-monospace">{{ log.ip_address or '—' }}</small>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center py-5">
+              <div class="empty-state">
+                <i class="bi bi-journal-x"></i>
+                <p class="mt-2">Aucun événement enregistré.</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# ── Pagination ── #}
+  {% if pages > 1 %}
+  <div class="card-footer d-flex justify-content-between align-items-center py-2 px-3"
+       style="font-size:.82rem;background:#f8fafc;">
+    <span class="text-muted">Page {{ page }} / {{ pages }}</span>
+    <div class="d-flex gap-1">
+      {% if page > 1 %}
+      <a href="{{ url_for('admin_journal', page=page-1, user=f_user, action=f_action, entity=f_entity) }}"
+         class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      {% endif %}
+      {% if page < pages %}
+      <a href="{{ url_for('admin_journal', page=page+1, user=f_user, action=f_action, entity=f_entity) }}"
+         class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

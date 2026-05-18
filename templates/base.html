@@ -290,6 +290,18 @@
          class="nav-link {% if request.endpoint == 'parametres' %}active{% endif %}">
         <i class="bi bi-gear-fill"></i> Paramètres
       </a>
+      {% if current_role == 'admin' %}
+      <hr/>
+      <div style="padding:4px 20px;font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.35);font-weight:700;">Administration</div>
+      <a href="{{ url_for('admin_utilisateurs') }}"
+         class="nav-link {% if request.endpoint in ['admin_utilisateurs','admin_ajouter_utilisateur','admin_modifier_utilisateur'] %}active{% endif %}">
+        <i class="bi bi-people-fill"></i> Utilisateurs
+      </a>
+      <a href="{{ url_for('admin_journal') }}"
+         class="nav-link {% if request.endpoint == 'admin_journal' %}active{% endif %}">
+        <i class="bi bi-journal-text"></i> Journal d'audit
+      </a>
+      {% endif %}
     </nav>
     <div class="sb-offcanvas-footer">
       <small>ART &copy; 2026 — v1.0</small>
@@ -339,6 +351,18 @@
        class="nav-link {% if request.endpoint == 'parametres' %}active{% endif %}">
       <i class="bi bi-gear-fill"></i> Paramètres
     </a>
+    {% if current_role == 'admin' %}
+    <hr/>
+    <div style="padding:4px 20px;font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.35);font-weight:700;">Administration</div>
+    <a href="{{ url_for('admin_utilisateurs') }}"
+       class="nav-link {% if request.endpoint in ['admin_utilisateurs','admin_ajouter_utilisateur','admin_modifier_utilisateur'] %}active{% endif %}">
+      <i class="bi bi-people-fill"></i> Utilisateurs
+    </a>
+    <a href="{{ url_for('admin_journal') }}"
+       class="nav-link {% if request.endpoint == 'admin_journal' %}active{% endif %}">
+      <i class="bi bi-journal-text"></i> Journal d'audit
+    </a>
+    {% endif %}
   </nav>
   <div class="sb-footer">
     <small>ART © 2026 — v1.0</small>
