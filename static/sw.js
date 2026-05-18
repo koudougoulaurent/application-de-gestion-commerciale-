@@ -1,13 +1,17 @@
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v5';
 const STATIC_CACHE  = 'art-static-' + CACHE_VERSION;
 const PAGES_CACHE   = 'art-pages-'  + CACHE_VERSION;
 
-// Ressources à pré-charger dès l'installation
-const PRECACHE = [
+// Ressources locales critiques (MUST succeed)
+const PRECACHE_LOCAL = [
   '/offline',
   '/static/logo.png',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
+];
+
+// Ressources CDN optionnelles (échec silencieux)
+const PRECACHE_CDN = [
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css',
   'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css',
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js',
@@ -16,9 +20,16 @@ const PRECACHE = [
 // ── Installation ──────────────────────────────────────────────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(STATIC_CACHE)
-      .then(cache => cache.addAll(PRECACHE))
-      .then(() => self.skipWaiting())
+    caches.open(STATIC_CACHE).then(async cache => {
+      // Fichiers locaux : on attend que ça réussisse
+      await cache.addAll(PRECACHE_LOCAL);
+      // CDN : on essaie en parallèle, sans bloquer si ça échoue
+      await Promise.allSettled(
+        PRECACHE_CDN.map(url =>
+          fetch(url).then(r => { if (r.ok) cache.put(url, r); }).catch(() => {})
+        )
+      );
+    }).then(() => self.skipWaiting())
   );
 });
 

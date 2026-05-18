@@ -1304,6 +1304,7 @@ def pwa_manifest():
     from flask import send_from_directory
     resp = send_from_directory('static', 'manifest.json')
     resp.headers['Content-Type'] = 'application/manifest+json'
+    resp.headers['Cache-Control'] = 'no-cache'
     return resp
 
 
