@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v6';
 const STATIC_CACHE  = 'art-static-' + CACHE_VERSION;
 const PAGES_CACHE   = 'art-pages-'  + CACHE_VERSION;
 
@@ -76,7 +76,13 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 4. Pages HTML → Network-First avec fallback cache puis offline
+  // 4. Auth → Network-Only (jamais de cache sur les pages d'auth)
+  if (url.pathname === '/login' || url.pathname === '/logout') {
+    event.respondWith(fetch(req).catch(() => caches.match('/offline')));
+    return;
+  }
+
+  // 5. Pages HTML → Network-First avec fallback cache puis offline
   event.respondWith(networkFirst(req));
 });
 

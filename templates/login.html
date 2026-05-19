@@ -254,8 +254,11 @@
         </div>
       </div>
 
-      <button type="submit" class="btn-login">
-        <i class="bi bi-box-arrow-in-right me-2"></i>Se connecter
+      <button type="submit" class="btn-login" id="loginBtn">
+        <span id="btnText"><i class="bi bi-box-arrow-in-right me-2"></i>Se connecter</span>
+        <span id="btnSpinner" style="display:none;">
+          <span class="spinner-border spinner-border-sm me-2" role="status"></span>Connexion…
+        </span>
       </button>
     </form>
 
@@ -276,6 +279,15 @@
         ico.className = 'bi bi-eye-fill';
       }
     }
+    // Spinner immédiat à la soumission du formulaire
+    document.querySelector('form').addEventListener('submit', function() {
+      var btn = document.getElementById('loginBtn');
+      var txt = document.getElementById('btnText');
+      var spin = document.getElementById('btnSpinner');
+      btn.disabled = true;
+      txt.style.display = 'none';
+      spin.style.display = 'inline';
+    });
   </script>
 </body>
 </html>

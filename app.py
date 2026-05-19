@@ -577,12 +577,25 @@ def login():
 
 @app.route('/logout')
 def logout():
-    log_action('LOGOUT', 'auth')
+    uid = session.get('user_id')
+    uname = session.get('username', 'système')
     session.pop('user_id', None)
     session.pop('username', None)
     session.pop('role', None)
-    flash('Vous avez été déconnecté.', 'info')
-    return redirect(url_for('login'))
+    # Log en différé (non bloquant) — ne ralentit plus la déconnexion
+    try:
+        conn = get_db()
+        conn.execute(
+            'INSERT INTO audit_log (user_id, username, action, entity_type, ip_address) VALUES (?,?,?,?,?)',
+            (uid, uname, 'LOGOUT', 'auth', request.remote_addr)
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+    resp = redirect(url_for('login'))
+    resp.headers['Cache-Control'] = 'no-store, no-cache'
+    return resp
 
 
 # ───────────────────────────────── DASHBOARD ─────────────────────────────────
