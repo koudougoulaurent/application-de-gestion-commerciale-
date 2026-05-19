@@ -63,9 +63,17 @@
                 <i class="bi bi-eye"></i>
               </a>
               <a href="{{ url_for('modifier_client', cid=c.id) }}"
-                 class="btn btn-sm btn-outline-secondary" title="Modifier">
+                 class="btn btn-sm btn-outline-secondary me-1" title="Modifier">
                 <i class="bi bi-pencil"></i>
               </a>
+              <form method="post" action="{{ url_for('supprimer_client', cid=c.id) }}"
+                    class="d-inline"
+                    onsubmit="return confirm('Supprimer le client {{ c.nom }} {{ c.prenom }} ?\nCette action est irréversible.')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button class="btn btn-sm btn-outline-danger" title="Supprimer">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
             </td>
           </tr>
           {% endfor %}

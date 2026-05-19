@@ -727,6 +727,27 @@ def detail_client(cid):
                            stats=stats, params=params)
 
 
+@app.route('/clients/<int:cid>/supprimer', methods=['POST'])
+def supprimer_client(cid):
+    conn = get_db()
+    nb_actifs = conn.execute(
+        "SELECT COUNT(*) AS n FROM ventes WHERE client_id=? AND statut='en_cours'", (cid,)
+    ).fetchone()['n']
+    if nb_actifs > 0:
+        conn.close()
+        flash('Impossible de supprimer ce client : il a des crédits non soldés.', 'danger')
+        return redirect(url_for('clients'))
+    client = conn.execute('SELECT nom, prenom FROM clients WHERE id=?', (cid,)).fetchone()
+    conn.execute('DELETE FROM ventes WHERE client_id=?', (cid,))
+    conn.execute('DELETE FROM clients WHERE id=?', (cid,))
+    conn.commit()
+    conn.close()
+    nom = f"{client['nom']} {client['prenom']}" if client else str(cid)
+    log_action('DELETE', 'client', entity_id=cid, details={'nom': nom})
+    flash(f'Client {nom} supprimé avec succès.', 'success')
+    return redirect(url_for('clients'))
+
+
 # ───────────────────────────────── PRODUITS ─────────────────────────────────
 
 @app.route('/produits')
